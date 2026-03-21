@@ -14,7 +14,7 @@ public struct AgentCard: Codable, Sendable, Equatable {
     public let description: String?
 
     /// エージェントのURL
-    public let url: String
+    public let url: URL
 
     /// エージェントのプロバイダー情報
     public let provider: AgentProvider?
@@ -23,7 +23,7 @@ public struct AgentCard: Codable, Sendable, Equatable {
     public let version: String?
 
     /// ドキュメントURL
-    public let documentationUrl: String?
+    public let documentationUrl: URL?
 
     /// エージェントの能力
     public let capabilities: AgentCapabilities?
@@ -52,10 +52,10 @@ public struct AgentCard: Codable, Sendable, Equatable {
     public init(
         name: String,
         description: String? = nil,
-        url: String,
+        url: URL,
         provider: AgentProvider? = nil,
         version: String? = nil,
-        documentationUrl: String? = nil,
+        documentationUrl: URL? = nil,
         capabilities: AgentCapabilities? = nil,
         securitySchemes: [String: SecurityScheme]? = nil,
         security: [[String: [String]]]? = nil,
@@ -82,19 +82,118 @@ public struct AgentCard: Codable, Sendable, Equatable {
     }
 }
 
+// MARK: - AgentCard Decodable
+
+extension AgentCard {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        name = try container.decode(String.self, forKey: .name)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+
+        // Decode url with URL type checking
+        if let urlString = try container.decodeIfPresent(String.self, forKey: .url),
+           let url = URL(string: urlString) {
+            self.url = url
+        } else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .url,
+                in: container,
+                debugDescription: "Invalid URL format"
+            )
+        }
+
+        provider = try container.decodeIfPresent(AgentProvider.self, forKey: .provider)
+        version = try container.decodeIfPresent(String.self, forKey: .version)
+
+        // Decode documentationUrl with URL type checking
+        if let docUrlString = try container.decodeIfPresent(String.self, forKey: .documentationUrl) {
+            guard let docUrl = URL(string: docUrlString) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .documentationUrl,
+                    in: container,
+                    debugDescription: "Invalid URL format for documentationUrl"
+                )
+            }
+            documentationUrl = docUrl
+        } else {
+            documentationUrl = nil
+        }
+
+        capabilities = try container.decodeIfPresent(AgentCapabilities.self, forKey: .capabilities)
+        securitySchemes = try container.decodeIfPresent([String: SecurityScheme].self, forKey: .securitySchemes)
+        security = try container.decodeIfPresent([[String: [String]]].self, forKey: .security)
+        skills = try container.decodeIfPresent([AgentSkill].self, forKey: .skills)
+        defaultInputModes = try container.decodeIfPresent([String].self, forKey: .defaultInputModes)
+        defaultOutputModes = try container.decodeIfPresent([String].self, forKey: .defaultOutputModes)
+        supportsAuthenticatedExtendedCard = try container.decodeIfPresent(Bool.self, forKey: .supportsAuthenticatedExtendedCard)
+        extensions = try container.decodeIfPresent([AgentExtension].self, forKey: .extensions)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case description
+        case url
+        case provider
+        case version
+        case documentationUrl
+        case capabilities
+        case securitySchemes
+        case security
+        case skills
+        case defaultInputModes
+        case defaultOutputModes
+        case supportsAuthenticatedExtendedCard
+        case extensions
+    }
+}
+
 // MARK: - AgentProvider
 
 /// エージェントのプロバイダー情報
-public struct AgentProvider: Codable, Sendable, Equatable {
+public struct AgentProvider: Sendable, Equatable {
     /// プロバイダー名
     public let organization: String
 
     /// プロバイダーURL
-    public let url: String?
+    public let url: URL?
 
-    public init(organization: String, url: String? = nil) {
+    public init(organization: String, url: URL? = nil) {
         self.organization = organization
         self.url = url
+    }
+}
+
+extension AgentProvider: Codable {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        organization = try container.decode(String.self, forKey: .organization)
+
+        if let urlString = try container.decodeIfPresent(String.self, forKey: .url) {
+            guard let url = URL(string: urlString) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .url,
+                    in: container,
+                    debugDescription: "Invalid URL format for provider url"
+                )
+            }
+            self.url = url
+        } else {
+            url = nil
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(organization, forKey: .organization)
+        if let url = url {
+            try container.encode(url.absoluteString, forKey: .url)
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case organization
+        case url
     }
 }
 

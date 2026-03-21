@@ -1,5 +1,23 @@
 import Foundation
 
+// MARK: - APIKeyLocation
+
+/// API キーの配置場所
+public enum APIKeyLocation: String, Codable, Sendable, CaseIterable {
+    case header
+    case query
+    case cookie
+}
+
+// MARK: - HTTPScheme
+
+/// HTTP 認証スキーム
+public enum HTTPScheme: String, Codable, Sendable, CaseIterable {
+    case basic
+    case bearer
+    case digest
+}
+
 // MARK: - SecurityScheme
 
 /// セキュリティスキーム定義
@@ -63,10 +81,10 @@ extension SecurityScheme: Codable {
 public struct APIKeyScheme: Codable, Sendable, Equatable {
     public let type: String
     public let name: String
-    public let `in`: String
+    public let `in`: APIKeyLocation
     public let description: String?
 
-    public init(name: String, in location: String, description: String? = nil) {
+    public init(name: String, in location: APIKeyLocation, description: String? = nil) {
         self.type = "apiKey"
         self.name = name
         self.in = location
@@ -79,11 +97,11 @@ public struct APIKeyScheme: Codable, Sendable, Equatable {
 /// HTTP認証スキーム
 public struct HTTPAuthScheme: Codable, Sendable, Equatable {
     public let type: String
-    public let scheme: String
+    public let scheme: HTTPScheme
     public let bearerFormat: String?
     public let description: String?
 
-    public init(scheme: String, bearerFormat: String? = nil, description: String? = nil) {
+    public init(scheme: HTTPScheme, bearerFormat: String? = nil, description: String? = nil) {
         self.type = "http"
         self.scheme = scheme
         self.bearerFormat = bearerFormat
@@ -131,22 +149,95 @@ public struct OAuthFlows: Codable, Sendable, Equatable {
 // MARK: - OAuthFlow
 
 /// OAuth 2.0フロー詳細
-public struct OAuthFlow: Codable, Sendable, Equatable {
-    public let authorizationUrl: String?
-    public let tokenUrl: String?
-    public let refreshUrl: String?
+public struct OAuthFlow: Sendable, Equatable {
+    public let authorizationUrl: URL?
+    public let tokenUrl: URL?
+    public let refreshUrl: URL?
     public let scopes: [String: String]?
 
     public init(
-        authorizationUrl: String? = nil,
-        tokenUrl: String? = nil,
-        refreshUrl: String? = nil,
+        authorizationUrl: URL? = nil,
+        tokenUrl: URL? = nil,
+        refreshUrl: URL? = nil,
         scopes: [String: String]? = nil
     ) {
         self.authorizationUrl = authorizationUrl
         self.tokenUrl = tokenUrl
         self.refreshUrl = refreshUrl
         self.scopes = scopes
+    }
+}
+
+extension OAuthFlow: Codable {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // Decode authorizationUrl
+        if let authUrlString = try container.decodeIfPresent(String.self, forKey: .authorizationUrl) {
+            guard let authUrl = URL(string: authUrlString) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .authorizationUrl,
+                    in: container,
+                    debugDescription: "Invalid URL format for authorizationUrl"
+                )
+            }
+            authorizationUrl = authUrl
+        } else {
+            authorizationUrl = nil
+        }
+
+        // Decode tokenUrl
+        if let tokenUrlString = try container.decodeIfPresent(String.self, forKey: .tokenUrl) {
+            guard let tokenUrl = URL(string: tokenUrlString) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .tokenUrl,
+                    in: container,
+                    debugDescription: "Invalid URL format for tokenUrl"
+                )
+            }
+            self.tokenUrl = tokenUrl
+        } else {
+            tokenUrl = nil
+        }
+
+        // Decode refreshUrl
+        if let refreshUrlString = try container.decodeIfPresent(String.self, forKey: .refreshUrl) {
+            guard let refreshUrl = URL(string: refreshUrlString) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .refreshUrl,
+                    in: container,
+                    debugDescription: "Invalid URL format for refreshUrl"
+                )
+            }
+            self.refreshUrl = refreshUrl
+        } else {
+            refreshUrl = nil
+        }
+
+        scopes = try container.decodeIfPresent([String: String].self, forKey: .scopes)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let authUrl = authorizationUrl {
+            try container.encode(authUrl.absoluteString, forKey: .authorizationUrl)
+        }
+        if let tokenUrl = tokenUrl {
+            try container.encode(tokenUrl.absoluteString, forKey: .tokenUrl)
+        }
+        if let refreshUrl = refreshUrl {
+            try container.encode(refreshUrl.absoluteString, forKey: .refreshUrl)
+        }
+        if let scopes = scopes {
+            try container.encode(scopes, forKey: .scopes)
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case authorizationUrl
+        case tokenUrl
+        case refreshUrl
+        case scopes
     }
 }
 

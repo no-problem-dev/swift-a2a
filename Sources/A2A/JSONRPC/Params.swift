@@ -77,26 +77,19 @@ public enum SendMessageResult: Sendable, Equatable {
 
 extension SendMessageResult: Codable {
     private enum CodingKeys: String, CodingKey {
-        case type
+        case status
     }
 
     public init(from decoder: Decoder) throws {
-        // まずタスクとしてデコードを試みる
-        if let task = try? A2ATask(from: decoder) {
-            self = .task(task)
-            return
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // If 'status' field is present, it's a Task
+        if container.contains(.status) {
+            self = .task(try A2ATask(from: decoder))
+        } else {
+            // Otherwise, it's an Artifact
+            self = .artifact(try Artifact(from: decoder))
         }
-        // 次にアーティファクトとして試みる
-        if let artifact = try? Artifact(from: decoder) {
-            self = .artifact(artifact)
-            return
-        }
-        throw DecodingError.dataCorrupted(
-            DecodingError.Context(
-                codingPath: decoder.codingPath,
-                debugDescription: "Cannot decode SendMessageResult"
-            )
-        )
     }
 
     public func encode(to encoder: Encoder) throws {

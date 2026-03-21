@@ -43,7 +43,7 @@ public struct A2ATask: Codable, Sendable, Equatable {
 
 // MARK: - TaskState
 
-/// タスクの状態（8状態）
+/// タスクの状態（7状態）
 public enum TaskState: String, Codable, Sendable, Equatable {
     /// 送信済み
     case submitted
@@ -57,10 +57,23 @@ public enum TaskState: String, Codable, Sendable, Equatable {
     case canceled
     /// 失敗
     case failed
-    /// 不明
-    case unknown
     /// 認証が必要
     case authRequired = "auth-required"
+}
+
+extension TaskState {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+
+        // Try to match known cases first
+        if let knownCase = TaskState(rawValue: rawValue) {
+            self = knownCase
+        } else {
+            // Unknown values default to submitted
+            self = .submitted
+        }
+    }
 }
 
 // MARK: - TaskStatus
@@ -74,12 +87,12 @@ public struct TaskStatus: Codable, Sendable, Equatable {
     public let message: Message?
 
     /// タイムスタンプ
-    public let timestamp: String?
+    public let timestamp: Date?
 
     public init(
         state: TaskState,
         message: Message? = nil,
-        timestamp: String? = nil
+        timestamp: Date? = nil
     ) {
         self.state = state
         self.message = message

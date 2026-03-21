@@ -46,6 +46,7 @@ public actor A2AClient {
 
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
+        self.decoder.dateDecodingStrategy = .iso8601
     }
 
     // MARK: - Public API
@@ -235,8 +236,14 @@ public actor A2AClient {
                             from: eventData
                         ), let result = artifactEvent.result {
                             continuation.yield(.artifactUpdate(result))
+                        } else {
+                            // Log unknown events
+                            if let eventType = event.type {
+                                print("[A2AClient SSE] Unknown event type: \(eventType)")
+                            } else {
+                                print("[A2AClient SSE] Received unknown SSE event: \(event.data.prefix(100))")
+                            }
                         }
-                        // パースできないイベントは無視
                     }
                     continuation.finish()
                 } catch {
@@ -263,7 +270,7 @@ public actor A2AClient {
         do {
             request.httpBody = try encoder.encode(body)
         } catch {
-            throw A2AError.decodingError(underlying: error)
+            throw A2AError.encodingError(underlying: error)
         }
 
         return request

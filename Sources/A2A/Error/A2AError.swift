@@ -16,6 +16,9 @@ public enum A2AError: Error, LocalizedError, Sendable {
     /// デコードエラー
     case decodingError(underlying: Error)
 
+    /// エンコードエラー
+    case encodingError(underlying: Error)
+
     /// ストリーミングエラー
     case streamingError(String)
 
@@ -38,6 +41,8 @@ public enum A2AError: Error, LocalizedError, Sendable {
             return "Empty result from A2A server"
         case .decodingError(let error):
             return "Failed to decode A2A response: \(error.localizedDescription)"
+        case .encodingError(let error):
+            return "Failed to encode A2A request: \(error.localizedDescription)"
         case .streamingError(let message):
             return "Streaming error: \(message)"
         case .invalidURL(let url):
