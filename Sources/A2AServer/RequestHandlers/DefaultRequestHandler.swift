@@ -13,6 +13,9 @@ public actor DefaultRequestHandler: RequestHandler {
     private let pushConfigStore: (any PushNotificationConfigStore)?
     private let pushSender: (any PushNotificationSender)?
 
+    /// 実行中の producer（`execute`）Task を taskId 別に追跡し、`onCancelTask` で中断できるようにする。
+    private var runningProducers: [TaskID: Task<Void, Never>] = [:]
+
     public init(
         agentCard: AgentCard,
         executor: any AgentExecutor,
@@ -76,15 +79,21 @@ public actor DefaultRequestHandler: RequestHandler {
 
         return AsyncThrowingStream { continuation in
             let producer = Task { await Self.runExecutor(executor, requestContext, queue) }
-            Task { [weak self] in
+            let consumer = Task { [weak self] in
+                await self?.registerProducer(producer, for: requestContext.taskId)
                 for await event in stream {
                     _ = try? await taskManager.process(event)
                     await self?.sendPushIfNeeded(requestContext.taskId, event)
                     continuation.yield(event)
                 }
                 _ = await producer.value
+                await self?.removeProducer(for: requestContext.taskId)
                 await self?.queueManager.close(requestContext.taskId)
                 continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                producer.cancel()
+                consumer.cancel()
             }
         }
     }
@@ -108,24 +117,27 @@ public actor DefaultRequestHandler: RequestHandler {
         if task.status.state.isTerminal {
             throw A2AServerError.taskNotCancelable(params.id)
         }
-        let requestContext = RequestContext(
+        // 実行中の producer があれば中断し、そのキューを破棄する（実行中ワーカーを途中で止める）。
+        runningProducers[task.id]?.cancel()
+        runningProducers[task.id] = nil
+        await queueManager.close(task.id)
+
+        // 権威的に canceled へ遷移して保存する。
+        var canceled = task
+        canceled.status = TaskStatus(state: .canceled, timestamp: Date())
+        try await taskStore.save(canceled)
+
+        // executor 側のクリーンアップを best-effort で呼ぶ（捨てキューに publish させ、状態保存はしない）。
+        let cleanupContext = RequestContext(
             message: nil,
             taskId: task.id,
             contextId: task.contextId ?? ContextID(UUID().uuidString),
             currentTask: task,
             callContext: context
         )
-        let queue = await queueManager.createOrGet(task.id)
-        let taskManager = TaskManager(taskId: task.id, contextId: requestContext.contextId, store: taskStore, initialTask: task)
-        let executor = self.executor
-        let stream = await queue.tap()
-        let producer = Task { await Self.runCancel(executor, requestContext, queue) }
-        for await event in stream {
-            try await taskManager.process(event)
-        }
-        _ = await producer.value
-        await queueManager.close(task.id)
-        return await taskManager.getTask()
+        await Self.runCancel(executor, cleanupContext, EventQueue())
+
+        return canceled
     }
 
     // MARK: - tasks:subscribe
@@ -187,6 +199,14 @@ public actor DefaultRequestHandler: RequestHandler {
 
     // MARK: - Private
 
+    private func registerProducer(_ task: Task<Void, Never>, for id: TaskID) {
+        runningProducers[id] = task
+    }
+
+    private func removeProducer(for id: TaskID) {
+        runningProducers[id] = nil
+    }
+
     private func buildContext(_ params: SendMessageRequest, _ context: ServerCallContext) async throws -> RequestContext {
         let message = params.message
         var current: A2ATask?
@@ -209,18 +229,21 @@ public actor DefaultRequestHandler: RequestHandler {
     private func drive(_ requestContext: RequestContext, queue: EventQueue, taskManager: TaskManager) async throws -> SendMessageResponse? {
         let stream = await queue.tap()
         let executor = self.executor
-        let producer = Task { await Self.runExecutor(executor, requestContext, queue) }
         var result: SendMessageResponse?
-        for await event in stream {
-            try await taskManager.process(event)
-            await sendPushIfNeeded(requestContext.taskId, event)
-            if case .message(let message) = event {
-                result = .message(message)
-            } else if event.isFinal || event.isInterrupt {
-                if let task = await taskManager.getTask() { result = .task(task) }
+        // 構造化: producer を子タスクとして起動する。drive（= onMessageSend）を await する
+        // 親（オーケストレータ）がキャンセルされると、この group ごと子の executor まで伝播する。
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { await Self.runExecutor(executor, requestContext, queue) }
+            for await event in stream {
+                try await taskManager.process(event)
+                await sendPushIfNeeded(requestContext.taskId, event)
+                if case .message(let message) = event {
+                    result = .message(message)
+                } else if event.isFinal || event.isInterrupt {
+                    if let task = await taskManager.getTask() { result = .task(task) }
+                }
             }
         }
-        _ = await producer.value
         await queueManager.close(requestContext.taskId)
         if result == nil, let task = await taskManager.getTask() {
             result = .task(task)
