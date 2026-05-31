@@ -2,7 +2,7 @@
 
 # swift-a2a
 
-[A2A (Agent2Agent) プロトコル](https://a2a-protocol.org/latest/) **v1.0** の Swift クライアント実装。
+[A2A (Agent2Agent) プロトコル](https://a2a-protocol.org/latest/) **v1.0** の Swift 実装（クライアント + サーバー + in-process）。
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![A2A](https://img.shields.io/badge/A2A-v1.0.1-green.svg)
@@ -25,8 +25,12 @@
 | `A2ACore` | 規定プロトコル層: 全ワイヤ型 + ProtoJSON Codable + 構築ビルダー | StructuredDataCore |
 | `A2AClientREST` | REST（HTTP+JSON）バインディングのクライアント | A2ACore |
 | `A2AClientJSONRPC` | JSON-RPC 2.0 バインディングのクライアント | A2ACore |
+| `A2AServer` | サーバ実装フレームワーク: `AgentExecutor` / `RequestHandler` / `TaskStore` / `TaskUpdater` / `EventQueue` など（トランスポート非依存） | A2ACore |
+| `A2AServerJSONRPC` | JSON-RPC バインディングのサーバ側ディスパッチャ（HTTP 非依存） | A2AServer |
+| `A2AServerREST` | REST バインディングのサーバ側ディスパッチャ（HTTP 非依存） | A2AServer |
+| `A2AInProcess` | 同一プロセス内で client(`A2ATransport`) ↔ server(`RequestHandler`) を型直結（HTTP/シリアライズ無し） | A2AClientCore + A2AServer |
 
-サーバ実装などで型だけ欲しいときは `A2ACore` のみを import します。クライアントは使うバインディングの product を import します（両方入れて Agent Card から選択することも可能）。
+クライアントだけ欲しいときは使うバインディングの product を import します（両方入れて Agent Card から選択することも可能）。サーバを実装するときは `A2AServer` に `AgentExecutor` を実装し、`DefaultRequestHandler` に渡します。HTTP を介さず同一プロセスで動かすなら `A2AInProcess` の `A2AClient.inProcess(handler:)` を使います（リモートに切り替えたくなったら transport を差し替えるだけ）。
 
 ## インストール
 

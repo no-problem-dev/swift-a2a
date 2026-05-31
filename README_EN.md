@@ -2,7 +2,7 @@ English | [日本語](README.md)
 
 # swift-a2a
 
-A Swift client for the [A2A (Agent2Agent) protocol](https://a2a-protocol.org/latest/) **v1.0**.
+A Swift implementation of the [A2A (Agent2Agent) protocol](https://a2a-protocol.org/latest/) **v1.0** (client + server + in-process).
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![A2A](https://img.shields.io/badge/A2A-v1.0.1-green.svg)
@@ -25,8 +25,12 @@ A Swift client for the [A2A (Agent2Agent) protocol](https://a2a-protocol.org/lat
 | `A2ACore` | Protocol layer: all wire types + ProtoJSON Codable + builders | StructuredDataCore |
 | `A2AClientREST` | REST (HTTP+JSON) binding client | A2ACore |
 | `A2AClientJSONRPC` | JSON-RPC 2.0 binding client | A2ACore |
+| `A2AServer` | Server framework: `AgentExecutor` / `RequestHandler` / `TaskStore` / `TaskUpdater` / `EventQueue`, etc. (transport-agnostic) | A2ACore |
+| `A2AServerJSONRPC` | JSON-RPC binding server-side dispatcher (HTTP-agnostic) | A2AServer |
+| `A2AServerREST` | REST binding server-side dispatcher (HTTP-agnostic) | A2AServer |
+| `A2AInProcess` | In-process client(`A2ATransport`) ↔ server(`RequestHandler`) wiring with direct Swift types (no HTTP/serialization) | A2AClientCore + A2AServer |
 
-Import only `A2ACore` when you just need the types (e.g. a server). Import the binding product you need for the client (or both, to negotiate via the Agent Card).
+Import the binding product you need for the client (or both, to negotiate via the Agent Card). To implement a server, conform to `AgentExecutor` in `A2AServer` and pass it to `DefaultRequestHandler`. To run it in the same process without HTTP, use `A2AInProcess`'s `A2AClient.inProcess(handler:)` (swap the transport for REST/JSON-RPC later if you go remote).
 
 ## Installation
 
