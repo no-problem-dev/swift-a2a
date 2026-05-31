@@ -1,4 +1,5 @@
 import Foundation
+import StructuredDataCore
 
 // MARK: - TaskStatusUpdateEvent
 
@@ -14,13 +15,13 @@ public struct TaskStatusUpdateEvent: Codable, Sendable, Equatable {
     public let final: Bool?
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
     public init(
         id: String,
         status: TaskStatus,
         final: Bool? = nil,
-        metadata: [String: AnyCodable]? = nil
+        metadata: [String: StructuredValue]? = nil
     ) {
         self.id = id
         self.status = status
@@ -47,12 +48,12 @@ public struct TaskArtifactUpdateEvent: Codable, Sendable, Equatable {
     public let artifact: Artifact
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
     public init(
         id: String,
         artifact: Artifact,
-        metadata: [String: AnyCodable]? = nil
+        metadata: [String: StructuredValue]? = nil
     ) {
         self.id = id
         self.artifact = artifact

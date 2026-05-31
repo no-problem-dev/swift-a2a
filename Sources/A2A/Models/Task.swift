@@ -1,4 +1,5 @@
 import Foundation
+import StructuredDataCore
 
 // MARK: - A2ATask
 
@@ -22,7 +23,7 @@ public struct A2ATask: Codable, Sendable, Equatable {
     public let history: [Message]?
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
     public init(
         id: String,
@@ -30,7 +31,7 @@ public struct A2ATask: Codable, Sendable, Equatable {
         status: TaskStatus,
         artifacts: [Artifact]? = nil,
         history: [Message]? = nil,
-        metadata: [String: AnyCodable]? = nil
+        metadata: [String: StructuredValue]? = nil
     ) {
         self.id = id
         self.sessionId = sessionId

@@ -1,4 +1,5 @@
 import Foundation
+import StructuredDataCore
 
 // MARK: - Message
 
@@ -14,12 +15,12 @@ public struct Message: Codable, Sendable, Equatable {
     public let parts: [Part]
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
     public init(
         role: Role,
         parts: [Part],
-        metadata: [String: AnyCodable]? = nil
+        metadata: [String: StructuredValue]? = nil
     ) {
         self.role = role
         self.parts = parts
@@ -99,9 +100,9 @@ public struct TextPart: Codable, Sendable, Equatable {
     public let text: String
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
-    public init(text: String, metadata: [String: AnyCodable]? = nil) {
+    public init(text: String, metadata: [String: StructuredValue]? = nil) {
         self.type = "text"
         self.text = text
         self.metadata = metadata
@@ -119,9 +120,9 @@ public struct FilePart: Codable, Sendable, Equatable {
     public let file: FileContent
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
-    public init(file: FileContent, metadata: [String: AnyCodable]? = nil) {
+    public init(file: FileContent, metadata: [String: StructuredValue]? = nil) {
         self.type = "file"
         self.file = file
         self.metadata = metadata
@@ -165,12 +166,12 @@ public struct DataPart: Codable, Sendable, Equatable {
     public let type: String
 
     /// データ内容
-    public let data: [String: AnyCodable]
+    public let data: [String: StructuredValue]
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
-    public init(data: [String: AnyCodable], metadata: [String: AnyCodable]? = nil) {
+    public init(data: [String: StructuredValue], metadata: [String: StructuredValue]? = nil) {
         self.type = "data"
         self.data = data
         self.metadata = metadata

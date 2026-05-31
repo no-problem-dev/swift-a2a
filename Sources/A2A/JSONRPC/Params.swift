@@ -1,4 +1,5 @@
 import Foundation
+import StructuredDataCore
 
 // MARK: - MessageSendParams
 
@@ -11,12 +12,12 @@ public struct MessageSendParams: Codable, Sendable, Equatable {
     public let configuration: MessageSendConfiguration?
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
     public init(
         message: Message,
         configuration: MessageSendConfiguration? = nil,
-        metadata: [String: AnyCodable]? = nil
+        metadata: [String: StructuredValue]? = nil
     ) {
         self.message = message
         self.configuration = configuration
@@ -113,9 +114,9 @@ public struct GetTaskParams: Codable, Sendable, Equatable {
     public let historyLength: Int?
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
-    public init(id: String, historyLength: Int? = nil, metadata: [String: AnyCodable]? = nil) {
+    public init(id: String, historyLength: Int? = nil, metadata: [String: StructuredValue]? = nil) {
         self.id = id
         self.historyLength = historyLength
         self.metadata = metadata
@@ -130,9 +131,9 @@ public struct CancelTaskParams: Codable, Sendable, Equatable {
     public let id: String
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
-    public init(id: String, metadata: [String: AnyCodable]? = nil) {
+    public init(id: String, metadata: [String: StructuredValue]? = nil) {
         self.id = id
         self.metadata = metadata
     }
@@ -146,9 +147,9 @@ public struct ListTasksParams: Codable, Sendable, Equatable {
     public let sessionId: String?
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
-    public init(sessionId: String? = nil, metadata: [String: AnyCodable]? = nil) {
+    public init(sessionId: String? = nil, metadata: [String: StructuredValue]? = nil) {
         self.sessionId = sessionId
         self.metadata = metadata
     }
@@ -162,9 +163,9 @@ public struct TaskResubscribeParams: Codable, Sendable, Equatable {
     public let id: String
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
-    public init(id: String, metadata: [String: AnyCodable]? = nil) {
+    public init(id: String, metadata: [String: StructuredValue]? = nil) {
         self.id = id
         self.metadata = metadata
     }

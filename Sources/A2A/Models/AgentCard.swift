@@ -1,4 +1,5 @@
 import Foundation
+import StructuredDataCore
 
 // MARK: - AgentCard
 
@@ -295,13 +296,13 @@ public struct AgentExtension: Codable, Sendable, Equatable {
     public let required: Bool?
 
     /// 拡張パラメータ
-    public let params: [String: AnyCodable]?
+    public let params: [String: StructuredValue]?
 
     public init(
         uri: String,
         description: String? = nil,
         required: Bool? = nil,
-        params: [String: AnyCodable]? = nil
+        params: [String: StructuredValue]? = nil
     ) {
         self.uri = uri
         self.description = description

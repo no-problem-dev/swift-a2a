@@ -1,4 +1,5 @@
 import Foundation
+import StructuredDataCore
 
 // MARK: - JSONRPCId
 
@@ -86,9 +87,9 @@ public struct JSONRPCError: Codable, Sendable, Equatable {
     public let message: String
 
     /// 追加データ
-    public let data: AnyCodable?
+    public let data: StructuredValue?
 
-    public init(code: Int, message: String, data: AnyCodable? = nil) {
+    public init(code: Int, message: String, data: StructuredValue? = nil) {
         self.code = code
         self.message = message
         self.data = data

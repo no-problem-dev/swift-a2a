@@ -1,4 +1,5 @@
 import Foundation
+import StructuredDataCore
 
 // MARK: - Artifact
 
@@ -22,7 +23,7 @@ public struct Artifact: Codable, Sendable, Equatable {
     public let lastChunk: Bool?
 
     /// メタデータ
-    public let metadata: [String: AnyCodable]?
+    public let metadata: [String: StructuredValue]?
 
     public init(
         name: String? = nil,
@@ -30,7 +31,7 @@ public struct Artifact: Codable, Sendable, Equatable {
         parts: [Part],
         index: Int? = nil,
         lastChunk: Bool? = nil,
-        metadata: [String: AnyCodable]? = nil
+        metadata: [String: StructuredValue]? = nil
     ) {
         self.name = name
         self.description = description
