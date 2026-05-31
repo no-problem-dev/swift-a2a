@@ -2,13 +2,10 @@ import Foundation
 
 /// REST バインディングへの入力（HTTP フレームワーク非依存）。
 public struct RESTRequest: Sendable {
-    /// HTTP メソッド（"GET" / "POST" / "DELETE"）。
     public var method: String
     /// クエリを除いたパス（例 `/tasks/abc:cancel`）。
     public var path: String
-    /// クエリパラメータ。
     public var query: [String: String]
-    /// リクエストボディ（無ければ空）。
     public var body: Data
 
     public init(method: String, path: String, query: [String: String] = [:], body: Data = Data()) {
@@ -19,7 +16,6 @@ public struct RESTRequest: Sendable {
     }
 }
 
-/// REST バインディングからの単発応答。
 public struct RESTResponse: Sendable {
     public var status: Int
     public var body: Data
@@ -32,8 +28,6 @@ public struct RESTResponse: Sendable {
     }
 }
 
-/// REST リクエストの処理結果。
-///
 /// `stream` の各要素は封筒なしの `StreamResponse`（HTTP 層が SSE フレーミングする）。
 public enum RESTOutcome: Sendable {
     case response(RESTResponse)

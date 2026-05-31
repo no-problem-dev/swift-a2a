@@ -2,20 +2,15 @@ import A2ACore
 import A2AServer
 import Foundation
 
-/// JSON-RPC リクエストの処理結果。
-///
-/// 単発操作は `unary`、ストリーミング操作（SendStreamingMessage / SubscribeToTask）は
-/// `stream`。`stream` の各要素は 1 イベント分の JSON-RPC レスポンス封筒
+/// JSON-RPC リクエストの処理結果。`stream` の各要素は 1 イベント分のレスポンス封筒
 /// `{jsonrpc, id, result: <StreamResponse>}`（HTTP 層が SSE フレーミングする）。
 public enum JSONRPCOutcome: Sendable {
     case unary(Data)
     case stream(AsyncThrowingStream<Data, Error>)
 }
 
-/// JSON-RPC バインディングのサーバ側ディスパッチャ（a2a-python `JsonRpcDispatcher`）。
-///
-/// 封筒をデコードしてメソッドで分岐し、`RequestHandler` を呼び、レスポンス封筒へエンコードする。
-/// HTTP フレームワークには非依存（`Data` 入出力）なので単体テスト可能。
+/// JSON-RPC 封筒をデコードして `RequestHandler` を呼び、封筒へエンコードするディスパッチャ
+/// （a2a-python `JsonRpcDispatcher`）。HTTP 非依存（`Data` 入出力）。
 public struct JSONRPCHandler: Sendable {
     private let handler: any RequestHandler
     private let encoder = A2AJSON.encoder()
@@ -40,7 +35,6 @@ public struct JSONRPCHandler: Sendable {
         static let extendedCard = "GetExtendedAgentCard"
     }
 
-    /// リクエスト封筒を処理する。
     public func handle(_ requestData: Data, context: ServerCallContext = ServerCallContext()) async -> JSONRPCOutcome {
         guard let meta = try? decoder.decode(JSONRPCMeta.self, from: requestData) else {
             return .unary(failure(id: .null, code: A2ARPCError.parseError, message: "Parse error"))

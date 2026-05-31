@@ -2,11 +2,8 @@ import A2ACore
 import A2AServer
 import Foundation
 
-/// REST（HTTP+JSON）バインディングのサーバ側ディスパッチャ（a2a-python `RESTHandler` / `rest_dispatcher`）。
-///
-/// `(HTTP method, path, query, body)` を仕様 §11 のリソースマッピングに従ってルーティングし、
-/// `RequestHandler` を呼び、封筒なしの JSON 本体（エラーは `google.rpc.Status`）へエンコードする。
-/// HTTP フレームワーク非依存（`RESTRequest`/`RESTResponse`）なので単体テスト可能。
+/// `(method, path, query, body)` を仕様 §11 のリソースマッピングでルーティングして `RequestHandler`
+/// を呼ぶディスパッチャ（a2a-python `rest_dispatcher`）。HTTP 非依存（`RESTRequest`/`RESTResponse`）。
 public struct RESTHandler: Sendable {
     private let handler: any RequestHandler
     private let encoder = A2AJSON.encoder()
@@ -20,22 +17,18 @@ public struct RESTHandler: Sendable {
         let segments = request.path.split(separator: "/").map(String.init)
         let method = request.method.uppercased()
 
-        // POST /message:send, /message:stream
         if segments.count == 1, segments[0] == "message:send", method == "POST" {
             return await sendMessage(request.body, context)
         }
         if segments.count == 1, segments[0] == "message:stream", method == "POST" {
             return await sendStreamingMessage(request.body, context)
         }
-        // GET /extendedAgentCard
         if segments.count == 1, segments[0] == "extendedAgentCard", method == "GET" {
             return await extendedCard(context)
         }
-        // GET /tasks
         if segments.count == 1, segments[0] == "tasks", method == "GET" {
             return await listTasks(request.query, context)
         }
-        // /tasks/{id}, /tasks/{id}:cancel, /tasks/{id}:subscribe
         if segments.count == 2, segments[0] == "tasks" {
             let (rawId, verb) = splitVerb(segments[1])
             let id = TaskID(percentDecoded(rawId))
@@ -46,7 +39,6 @@ public struct RESTHandler: Sendable {
             default: return notFound()
             }
         }
-        // /tasks/{taskId}/pushNotificationConfigs[/{id}]
         if segments.count >= 3, segments[0] == "tasks", segments[2] == "pushNotificationConfigs" {
             let taskId = TaskID(percentDecoded(segments[1]))
             if segments.count == 3 {

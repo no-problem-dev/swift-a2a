@@ -1,9 +1,7 @@
 import A2ACore
 
-/// サーバ内部で `StreamResponse`（A2A 仕様の streaming/push ペイロード型）を
-/// 判定・分類するためのヘルパ。新しい型は導入せず、仕様型に対する内部アクセサのみ。
+// サーバ内部で仕様型 `StreamResponse` を判定・分類するアクセサ（新しい型は導入しない）。
 extension StreamResponse {
-    /// イベントが参照するタスク ID（メッセージにタスク ID が無ければ `nil`）。
     var taskID: TaskID? {
         switch self {
         case .task(let task): task.id
@@ -13,7 +11,6 @@ extension StreamResponse {
         }
     }
 
-    /// イベントが参照するコンテキスト ID。
     var contextID: ContextID? {
         switch self {
         case .task(let task): task.contextId
@@ -23,7 +20,6 @@ extension StreamResponse {
         }
     }
 
-    /// 終端イベント（Message 応答、または終端状態の Task/TaskStatusUpdateEvent）かどうか。
     var isFinal: Bool {
         switch self {
         case .message: true
@@ -33,7 +29,6 @@ extension StreamResponse {
         }
     }
 
-    /// 中断イベント（input-required / auth-required）かどうか。
     var isInterrupt: Bool {
         switch self {
         case .statusUpdate(let event): event.status.state.isInterrupted

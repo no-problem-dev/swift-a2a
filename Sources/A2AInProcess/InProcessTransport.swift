@@ -2,12 +2,8 @@ import A2ACore
 import A2AClientCore
 import A2AServer
 
-/// 同一プロセス内で `A2ATransport`（クライアント側）を `RequestHandler`（サーバ側）へ
-/// 直結する transport。HTTP もシリアライズも介さず、Swift の型をそのまま受け渡す。
-///
-/// オーケストレータ（クライアント）が、別 Task で動くワーカー（サーバ側 `AgentExecutor` を
-/// 包む `DefaultRequestHandler`）と、リモートと同一の A2A クライアント API で通信できる。
-/// 後でリモートに切り替えたくなったら transport を REST / JSON-RPC に差し替えるだけでよい。
+/// `A2ATransport`（クライアント側）を同一プロセスの `RequestHandler`（サーバ側）へ直結する transport。
+/// HTTP もシリアライズも介さず Swift の型をそのまま渡す。リモート化は transport の差し替えで済む。
 public struct InProcessTransport: A2ATransport {
     private let handler: any RequestHandler
     private let context: ServerCallContext
@@ -71,9 +67,7 @@ public struct InProcessTransport: A2ATransport {
         try await mapping { try await handler.onGetExtendedAgentCard(request, context: context) }
     }
 
-    // MARK: - Error mapping
-
-    /// サーバ側エラーを、リモート transport と同一の `A2AError.rpc` に写像する。
+    // サーバ側エラーをリモート transport と同一の `A2AError.rpc` に写像する。
     private func mapping<R>(_ body: () async throws -> R) async throws -> R {
         do {
             return try await body()

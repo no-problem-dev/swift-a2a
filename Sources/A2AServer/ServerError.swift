@@ -1,30 +1,17 @@
 import A2ACore
 
-/// A2A サーバ側のエラー（A2A 仕様 §5.4 のエラーコードに対応）。
-///
-/// Python `a2a.utils.errors` の各エラーに相当します。バインディング層が
-/// これを JSON-RPC error / google.rpc.Status に変換して応答します。
+/// A2A サーバ側のエラー（仕様 §5.4 のコードに対応、a2a-python `a2a.utils.errors` 相当）。
 public enum A2AServerError: Error, Sendable, Hashable {
-    /// 指定タスクが見つからない（`-32001`）。
     case taskNotFound(TaskID)
-    /// タスクがキャンセル不能な状態にある（`-32002`）。
     case taskNotCancelable(TaskID)
-    /// プッシュ通知が未対応（`-32003`）。
     case pushNotificationNotSupported
-    /// 要求された操作が未対応（`-32004`）。
     case unsupportedOperation(String)
-    /// コンテンツタイプ非対応（`-32005`）。
     case contentTypeNotSupported
-    /// エージェントの応答が不正（`-32006`）。
     case invalidAgentResponse(String)
-    /// 拡張 Agent Card 未設定（`-32007`）。
     case extendedAgentCardNotConfigured
-    /// パラメータ不正（`-32602`）。
     case invalidParams(String)
-    /// 内部エラー（`-32603`）。
     case internalError(String)
 
-    /// A2A 仕様のエラーコード。
     public var code: Int {
         switch self {
         case .taskNotFound: -32001
@@ -39,7 +26,6 @@ public enum A2AServerError: Error, Sendable, Hashable {
         }
     }
 
-    /// 人間可読なメッセージ。
     public var message: String {
         switch self {
         case .taskNotFound(let id): "Task not found: \(id)"

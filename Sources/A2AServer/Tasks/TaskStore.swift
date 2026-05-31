@@ -1,19 +1,14 @@
 import A2ACore
 import Foundation
 
-/// タスクの永続化インターフェース（a2a-python `TaskStore`）。
+/// タスクの永続化（a2a-python `TaskStore`）。
 public protocol TaskStore: Sendable {
-    /// タスクを保存（新規・更新）する。
     func save(_ task: A2ATask) async throws
-    /// タスクを取得する。存在しなければ `nil`。
     func get(_ id: TaskID) async throws -> A2ATask?
-    /// 条件でタスク一覧を取得する。
     func list(_ request: ListTasksRequest) async throws -> ListTasksResponse
-    /// タスクを削除する。
     func delete(_ id: TaskID) async throws
 }
 
-/// メモリ内 `TaskStore` 実装（a2a-python `InMemoryTaskStore`）。
 public actor InMemoryTaskStore: TaskStore {
     private var tasks: [TaskID: A2ATask] = [:]
 

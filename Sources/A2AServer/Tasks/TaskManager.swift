@@ -1,7 +1,6 @@
 import A2ACore
 
-/// 単一タスクの状態を、流れてくる `StreamResponse` から再構成・永続化する
-/// reducer（a2a-python `TaskManager`）。
+/// `StreamResponse` から単一タスクの状態を再構成・永続化する reducer（a2a-python `TaskManager`）。
 public actor TaskManager {
     private let taskId: TaskID
     private let contextId: ContextID
@@ -17,7 +16,6 @@ public actor TaskManager {
 
     public func getTask() -> A2ATask? { currentTask }
 
-    /// イベントを適用してタスク状態を更新し、ストアへ保存する。受け取ったイベントをそのまま返す。
     @discardableResult
     public func process(_ event: StreamResponse) async throws -> StreamResponse {
         switch event {
@@ -26,7 +24,6 @@ public actor TaskManager {
             try await store.save(task)
 
         case .message:
-            // Message は単発応答であり、タスク状態は変更しない。
             break
 
         case .statusUpdate(let update):

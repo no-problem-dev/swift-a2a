@@ -1,6 +1,6 @@
 import A2ACore
 
-/// JSON-RPC 2.0 の id（文字列 / 数値 / null）。仕様 §9。
+/// JSON-RPC 2.0 の id（文字列 / 数値 / null）。
 public enum JSONRPCID: Codable, Sendable, Hashable {
     case string(String)
     case number(Int)
@@ -29,18 +29,15 @@ public enum JSONRPCID: Codable, Sendable, Hashable {
     }
 }
 
-/// id と method だけを先読みする封筒。
 struct JSONRPCMeta: Decodable {
     let id: JSONRPCID?
     let method: String?
 }
 
-/// 指定 params 型へデコードするための封筒。
 struct JSONRPCParams<P: Decodable>: Decodable {
     let params: P?
 }
 
-/// JSON-RPC 成功レスポンス封筒（仕様 §9.4）。
 struct JSONRPCSuccess<R: Encodable>: Encodable {
     let jsonrpc = "2.0"
     let id: JSONRPCID
@@ -49,7 +46,6 @@ struct JSONRPCSuccess<R: Encodable>: Encodable {
     enum CodingKeys: String, CodingKey { case jsonrpc, id, result }
 }
 
-/// JSON-RPC エラーレスポンス封筒（仕様 §9.5）。
 struct JSONRPCFailure: Encodable {
     let jsonrpc = "2.0"
     let id: JSONRPCID
@@ -58,11 +54,10 @@ struct JSONRPCFailure: Encodable {
     enum CodingKeys: String, CodingKey { case jsonrpc, id, error }
 }
 
-/// JSON-RPC エラーオブジェクト。
 struct JSONRPCErrorObject: Encodable {
     let code: Int
     let message: String
 }
 
-/// void 操作（DeleteTaskPushNotificationConfig）の空結果（`{}`）。
+/// void 操作の空結果（`{}`）。
 struct EmptyResult: Encodable {}

@@ -1,10 +1,8 @@
 import A2ACore
 import Foundation
 
-/// `RequestHandler` の既定実装（a2a-python `DefaultRequestHandler`）。
-///
-/// `AgentExecutor` を producer task で起動し、`EventQueue` に流れる `StreamResponse` を
-/// `TaskManager` / `ResultAggregator` で集約・永続化し、必要に応じてプッシュ通知を送る。
+/// `AgentExecutor` を子タスクで起動し、`EventQueue` の `StreamResponse` を `TaskManager` /
+/// `ResultAggregator` で集約・永続化する `RequestHandler` 既定実装（a2a-python `DefaultRequestHandler`）。
 public actor DefaultRequestHandler: RequestHandler {
     private let agentCard: AgentCard
     private let executor: any AgentExecutor

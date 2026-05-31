@@ -4,10 +4,7 @@ import A2AClientCore
 import A2AServer
 
 extension A2AClient {
-    /// 同一プロセス内の `RequestHandler` に直結した A2A クライアントを生成。
-    ///
-    /// HTTP を介さないため `fetchAgentCard()`（well-known GET）は使えないが、
-    /// メッセージ送信・タスク操作・拡張カード取得など transport を通る操作はすべて動作する。
+    /// 同一プロセス内の `RequestHandler` に直結した A2A クライアントを生成（HTTP を介さない）。
     public static func inProcess(
         handler: any RequestHandler,
         context: ServerCallContext = ServerCallContext()
