@@ -45,18 +45,22 @@ public actor DefaultRequestHandler: RequestHandler {
         )
         let blocking = !(params.configuration?.returnImmediately ?? false)
 
-        let result: SendMessageResponse?
+        let result: SendMessageResponse
         if blocking {
-            result = try await drive(requestContext, queue: queue, taskManager: taskManager)
+            guard let driven = try await drive(requestContext, queue: queue, taskManager: taskManager) else {
+                throw A2AServerError.internalError("No result produced")
+            }
+            result = driven
         } else {
-            // returnImmediately: 権威ある集約はバックグラウンドで継続し、
-            // 最初に確定したスナップショットを返す。
-            let snapshotStream = await queue.tap()
+            // spec §448: タスクを作成したら即座に返す（実行は背景で継続）。イベント待ちはしない。
+            // 既存タスクが無ければ submitted のタスクを生成・永続化し、getTask が即引けるようにする。
+            let initialTask = requestContext.currentTask
+                ?? A2ATask(id: requestContext.taskId, contextId: requestContext.contextId, status: TaskStatus(state: .submitted, timestamp: Date()))
+            try await taskStore.save(initialTask, context: context)
             Task { [weak self] in _ = try? await self?.drive(requestContext, queue: queue, taskManager: taskManager) }
-            result = try await firstSnapshot(from: snapshotStream, taskManager: taskManager)
+            result = .task(initialTask)
         }
 
-        guard let result else { throw A2AServerError.internalError("No result produced") }
         return applyHistoryLength(result, configuration: params.configuration)
     }
 
@@ -275,23 +279,6 @@ public actor DefaultRequestHandler: RequestHandler {
             result = .task(task)
         }
         return result
-    }
-
-    /// 最初に確定したスナップショット（Task / Message）を返す（returnImmediately 用）。
-    private func firstSnapshot(from stream: AsyncStream<StreamResponse>, taskManager: TaskManager) async throws -> SendMessageResponse? {
-        for await event in stream {
-            if case .message(let message) = event {
-                return .message(message)
-            }
-            if let task = await taskManager.getTask() {
-                return .task(task)
-            }
-            if case .task(let task) = event {
-                return .task(task)
-            }
-        }
-        if let task = await taskManager.getTask() { return .task(task) }
-        return nil
     }
 
     /// SendMessageConfiguration 内の push 設定を store に登録する（a2a-python on_message_send 211-216）。

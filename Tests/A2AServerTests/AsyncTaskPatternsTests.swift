@@ -98,6 +98,30 @@ struct AsyncTaskPatternsTests {
         #expect(done)
     }
 
+    // パターン2b: 即時完了ワーカーでも returnImmediately はタスクを返す（イベント待ちでレースしない）。
+    @Test("returnImmediately は即時完了ワーカーでもタスクを返し、背景完了を getTask で確認できる")
+    func returnImmediatelyWithInstantWorker() async throws {
+        let store = InMemoryTaskStore()
+        let handler = DefaultRequestHandler(agentCard: card(), executor: InstantExecutor(), taskStore: store)
+        let taskId = TaskID("r-instant")
+
+        // 以前は firstSnapshot がイベントを取りこぼし「No result produced」になり得た。
+        let response = try await handler.onMessageSend(
+            SendMessageRequest(message: userMessage("go", taskId: taskId),
+                               configuration: SendMessageConfiguration(returnImmediately: true)),
+            context: ServerCallContext()
+        )
+        guard case .task = response else { Issue.record("expected task, got \(response)"); return }
+
+        var done = false
+        for _ in 0..<300 {
+            if let got = try await handler.onGetTask(GetTaskRequest(id: taskId), context: ServerCallContext()),
+               got.status.state.isTerminal { done = true; break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(done)
+    }
+
     // パターン3: subscribe（実行中タスクへ途中購読）
     @Test("subscribeToTask は実行中タスクの以降のイベントを受信し completed を見る")
     func subscribeToRunningTask() async throws {
