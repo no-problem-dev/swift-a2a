@@ -1,7 +1,7 @@
 /// A2A プロトコルの定数。
 public enum A2AProtocol {
-    /// このライブラリが実装する A2A プロトコルのバージョン。
-    public static let version = "1.0"
+    /// このライブラリが実装する A2A プロトコルのバージョン（spec v1.0.1 / a2a-python v1.1.0 準拠）。
+    public static let version = "1.0.1"
 
     /// Agent Card を公開する well-known パス（仕様 §14.3）。
     public static let agentCardWellKnownPath = "/.well-known/agent-card.json"

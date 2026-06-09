@@ -38,7 +38,7 @@ struct JSONRPCTransportTests {
         #expect(json.jsonrpc == "2.0")
         #expect(json.method == "SendMessage")
         #expect(json.params.message.text == "hello")
-        #expect(request.value(forHTTPHeaderField: "A2A-Version") == "1.0")
+        #expect(request.value(forHTTPHeaderField: "A2A-Version") == "1.0.1")
     }
 
     @Test func rpcErrorIsParsed() async throws {

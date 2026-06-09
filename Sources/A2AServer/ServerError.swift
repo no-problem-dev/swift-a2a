@@ -9,6 +9,8 @@ public enum A2AServerError: Error, Sendable, Hashable {
     case contentTypeNotSupported
     case invalidAgentResponse(String)
     case extendedAgentCardNotConfigured
+    case extensionSupportRequired
+    case versionNotSupported(String)
     case invalidParams(String)
     case internalError(String)
 
@@ -21,6 +23,8 @@ public enum A2AServerError: Error, Sendable, Hashable {
         case .contentTypeNotSupported: -32005
         case .invalidAgentResponse: -32006
         case .extendedAgentCardNotConfigured: -32007
+        case .extensionSupportRequired: -32008
+        case .versionNotSupported: -32009
         case .invalidParams: -32602
         case .internalError: -32603
         }
@@ -35,6 +39,8 @@ public enum A2AServerError: Error, Sendable, Hashable {
         case .contentTypeNotSupported: "Incompatible content types"
         case .invalidAgentResponse(let detail): "Invalid agent response: \(detail)"
         case .extendedAgentCardNotConfigured: "Extended agent card is not configured"
+        case .extensionSupportRequired: "Extension support required"
+        case .versionNotSupported(let detail): "Version not supported: \(detail)"
         case .invalidParams(let detail): "Invalid parameters: \(detail)"
         case .internalError(let detail): "Internal error: \(detail)"
         }

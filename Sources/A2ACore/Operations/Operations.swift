@@ -169,7 +169,8 @@ extension ListTasksResponse: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfNonEmpty(tasks, forKey: .tasks)
-        try container.encodeIfPresent(nextPageToken, forKey: .nextPageToken)
+        // spec §246 MUST: nextPageToken は常に present（終端は空文字）。
+        try container.encode(nextPageToken ?? "", forKey: .nextPageToken)
         try container.encode(pageSize, forKey: .pageSize)
         try container.encode(totalSize, forKey: .totalSize)
     }

@@ -5,12 +5,14 @@ public actor TaskManager {
     private let taskId: TaskID
     private let contextId: ContextID
     private let store: any TaskStore
+    private let callContext: ServerCallContext
     private var currentTask: A2ATask?
 
-    public init(taskId: TaskID, contextId: ContextID, store: any TaskStore, initialTask: A2ATask? = nil) {
+    public init(taskId: TaskID, contextId: ContextID, store: any TaskStore, initialTask: A2ATask? = nil, callContext: ServerCallContext = ServerCallContext()) {
         self.taskId = taskId
         self.contextId = contextId
         self.store = store
+        self.callContext = callContext
         self.currentTask = initialTask
     }
 
@@ -21,7 +23,7 @@ public actor TaskManager {
         switch event {
         case .task(let task):
             currentTask = task
-            try await store.save(task)
+            try await store.save(task, context: callContext)
 
         case .message:
             break
@@ -33,13 +35,13 @@ public actor TaskManager {
                 task.history.append(message)
             }
             currentTask = task
-            try await store.save(task)
+            try await store.save(task, context: callContext)
 
         case .artifactUpdate(let update):
             var task = ensureTask()
             upsert(artifact: update.artifact, append: update.append, into: &task)
             currentTask = task
-            try await store.save(task)
+            try await store.save(task, context: callContext)
         }
         return event
     }

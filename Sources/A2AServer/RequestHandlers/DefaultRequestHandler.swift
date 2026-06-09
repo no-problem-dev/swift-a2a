@@ -34,12 +34,14 @@ public actor DefaultRequestHandler: RequestHandler {
 
     public func onMessageSend(_ params: SendMessageRequest, context: ServerCallContext) async throws -> SendMessageResponse {
         let requestContext = try await buildContext(params, context)
+        await registerInlinePushConfig(params, taskId: requestContext.taskId, context: context)
         let queue = await queueManager.createOrGet(requestContext.taskId)
         let taskManager = TaskManager(
             taskId: requestContext.taskId,
             contextId: requestContext.contextId,
             store: taskStore,
-            initialTask: requestContext.currentTask
+            initialTask: requestContext.currentTask,
+            callContext: context
         )
         let blocking = !(params.configuration?.returnImmediately ?? false)
 
@@ -65,12 +67,14 @@ public actor DefaultRequestHandler: RequestHandler {
             throw A2AServerError.unsupportedOperation("Streaming is not supported by the agent")
         }
         let requestContext = try await buildContext(params, context)
+        await registerInlinePushConfig(params, taskId: requestContext.taskId, context: context)
         let queue = await queueManager.createOrGet(requestContext.taskId)
         let taskManager = TaskManager(
             taskId: requestContext.taskId,
             contextId: requestContext.contextId,
             store: taskStore,
-            initialTask: requestContext.currentTask
+            initialTask: requestContext.currentTask,
+            callContext: context
         )
         let stream = await queue.tap()
         let executor = self.executor
@@ -99,7 +103,7 @@ public actor DefaultRequestHandler: RequestHandler {
     // MARK: - tasks/get, list, cancel
 
     public func onGetTask(_ params: GetTaskRequest, context: ServerCallContext) async throws -> A2ATask? {
-        guard var task = try await taskStore.get(params.id) else { return nil }
+        guard var task = try await taskStore.get(params.id, context: context) else { return nil }
         if let length = params.historyLength {
             task.history = Array(task.history.suffix(max(0, length)))
         }
@@ -107,55 +111,79 @@ public actor DefaultRequestHandler: RequestHandler {
     }
 
     public func onListTasks(_ params: ListTasksRequest, context: ServerCallContext) async throws -> ListTasksResponse {
-        try await taskStore.list(params)
+        try await taskStore.list(params, context: context)
     }
 
     public func onCancelTask(_ params: CancelTaskRequest, context: ServerCallContext) async throws -> A2ATask? {
-        guard let task = try await taskStore.get(params.id) else { return nil }
+        // a2a-python on_cancel_task: 未知タスクは TaskNotFound、終端は TaskNotCancelable。
+        guard let task = try await taskStore.get(params.id, context: context) else {
+            throw A2AServerError.taskNotFound(params.id)
+        }
         if task.status.state.isTerminal {
             throw A2AServerError.taskNotCancelable(params.id)
         }
-        // 実行中の producer があれば中断し、そのキューを破棄する（実行中ワーカーを途中で止める）。
+        // 実行中の producer があれば中断し、そのストリームを閉じる。
         runningProducers[task.id]?.cancel()
         runningProducers[task.id] = nil
         await queueManager.close(task.id)
 
-        // 権威的に canceled へ遷移して保存する。
-        var canceled = task
-        canceled.status = TaskStatus(state: .canceled, timestamp: Date())
-        try await taskStore.save(canceled)
-
-        // executor 側のクリーンアップを best-effort で呼ぶ（捨てキューに publish させ、状態保存はしない）。
-        let cleanupContext = RequestContext(
+        // executor.cancel を専用キューで実行し、その出力イベントから結果を集約する
+        // （a2a-python: キャンセルは executor 主導。最終状態が CANCELED でなければ不可）。
+        let cancelContext = RequestContext(
             message: nil,
             taskId: task.id,
             contextId: task.contextId ?? ContextID(UUID().uuidString),
             currentTask: task,
             callContext: context
         )
-        await Self.runCancel(executor, cleanupContext, EventQueue())
+        let taskManager = TaskManager(
+            taskId: task.id,
+            contextId: cancelContext.contextId,
+            store: taskStore,
+            initialTask: task,
+            callContext: context
+        )
+        let queue = EventQueue()
+        let stream = await queue.tap()
+        let executor = self.executor
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await Self.runCancel(executor, cancelContext, queue) }
+            for await event in stream { _ = try? await taskManager.process(event) }
+        }
 
-        return canceled
+        let result = await taskManager.getTask() ?? task
+        if result.status.state != .canceled {
+            throw A2AServerError.taskNotCancelable(params.id)
+        }
+        return result
     }
 
     // MARK: - tasks:subscribe
 
     public func onSubscribeToTask(_ params: SubscribeToTaskRequest, context: ServerCallContext) async throws -> AsyncThrowingStream<StreamResponse, Error> {
-        guard let queue = await queueManager.get(params.id) else {
+        // a2a-python on_subscribe_to_task と同順: get → terminal → yield task → tap queue。
+        guard let task = try await taskStore.get(params.id, context: context) else {
             throw A2AServerError.taskNotFound(params.id)
         }
-        let snapshot = try await taskStore.get(params.id)
-        let stream = await queue.tap()
+        if task.status.state.isTerminal {
+            throw A2AServerError.unsupportedOperation("Task \(params.id) is in terminal state: \(task.status.state)")
+        }
+        let queue = await queueManager.get(params.id)
+        let stream = await queue?.tap()
         return AsyncThrowingStream { continuation in
-            if let snapshot {
-                continuation.yield(.task(snapshot))
+            // spec §311: 最初のイベントは必ず現在の Task。
+            continuation.yield(.task(task))
+            guard let stream else {
+                continuation.finish(throwing: A2AServerError.taskNotFound(params.id))
+                return
             }
-            Task {
+            let pump = Task {
                 for await event in stream {
                     continuation.yield(event)
                 }
                 continuation.finish()
             }
+            continuation.onTermination = { _ in pump.cancel() }
         }
     }
 
@@ -163,12 +191,12 @@ public actor DefaultRequestHandler: RequestHandler {
 
     public func onCreateTaskPushNotificationConfig(_ params: TaskPushNotificationConfig, context: ServerCallContext) async throws -> TaskPushNotificationConfig {
         guard let store = pushConfigStore else { throw A2AServerError.pushNotificationNotSupported }
-        return try await store.set(params)
+        return try await store.set(params, context: context)
     }
 
     public func onGetTaskPushNotificationConfig(_ params: GetTaskPushNotificationConfigRequest, context: ServerCallContext) async throws -> TaskPushNotificationConfig {
         guard let store = pushConfigStore else { throw A2AServerError.pushNotificationNotSupported }
-        let configs = try await store.get(taskId: params.taskId)
+        let configs = try await store.get(taskId: params.taskId, context: context)
         guard let match = configs.first(where: { $0.id == params.id }) else {
             throw A2AServerError.invalidParams("Push notification config not found: \(params.id)")
         }
@@ -177,13 +205,13 @@ public actor DefaultRequestHandler: RequestHandler {
 
     public func onListTaskPushNotificationConfigs(_ params: ListTaskPushNotificationConfigsRequest, context: ServerCallContext) async throws -> ListTaskPushNotificationConfigsResponse {
         guard let store = pushConfigStore else { throw A2AServerError.pushNotificationNotSupported }
-        let configs = try await store.get(taskId: params.taskId)
+        let configs = try await store.get(taskId: params.taskId, context: context)
         return ListTaskPushNotificationConfigsResponse(configs: configs)
     }
 
     public func onDeleteTaskPushNotificationConfig(_ params: DeleteTaskPushNotificationConfigRequest, context: ServerCallContext) async throws {
         guard let store = pushConfigStore else { throw A2AServerError.pushNotificationNotSupported }
-        try await store.delete(taskId: params.taskId, configId: params.id)
+        try await store.delete(taskId: params.taskId, configId: params.id, context: context)
     }
 
     // MARK: - extended agent card
@@ -209,7 +237,7 @@ public actor DefaultRequestHandler: RequestHandler {
         let message = params.message
         var current: A2ATask?
         if let taskId = message.taskId {
-            current = try await taskStore.get(taskId)
+            current = try await taskStore.get(taskId, context: context)
         }
         let taskId = message.taskId ?? current?.id ?? TaskID(UUID().uuidString)
         let contextId = message.contextId ?? current?.contextId ?? ContextID(UUID().uuidString)
@@ -266,9 +294,17 @@ public actor DefaultRequestHandler: RequestHandler {
         return nil
     }
 
+    /// SendMessageConfiguration 内の push 設定を store に登録する（a2a-python on_message_send 211-216）。
+    private func registerInlinePushConfig(_ params: SendMessageRequest, taskId: TaskID, context: ServerCallContext) async {
+        guard let store = pushConfigStore, var config = params.configuration?.taskPushNotificationConfig else { return }
+        if config.taskId == nil { config.taskId = taskId }
+        _ = try? await store.set(config, context: context)
+    }
+
     private func sendPushIfNeeded(_ taskId: TaskID, _ event: StreamResponse) async {
         guard let sender = pushSender, let store = pushConfigStore else { return }
-        guard let configs = try? await store.get(taskId: taskId), !configs.isEmpty else { return }
+        // 配信は owner 横断（a2a-python sender は get_info_for_dispatch を使う）。
+        guard let configs = try? await store.getForDispatch(taskId: taskId), !configs.isEmpty else { return }
         for config in configs {
             await sender.send(event, to: config)
         }

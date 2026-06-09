@@ -246,7 +246,7 @@ public struct RESTHandler: Sendable {
         switch error {
         case .taskNotFound, .extendedAgentCardNotConfigured: 404
         case .taskNotCancelable: 409
-        case .invalidParams, .contentTypeNotSupported: 400
+        case .invalidParams, .contentTypeNotSupported, .extensionSupportRequired, .versionNotSupported: 400
         case .pushNotificationNotSupported, .unsupportedOperation: 501
         case .invalidAgentResponse: 502
         case .internalError: 500
