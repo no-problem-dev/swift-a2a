@@ -69,6 +69,25 @@ public struct HTTPPushNotificationSender: PushNotificationSender {
     }
 }
 
+/// push 通知を**プロセス内**で配信する具体トランスポート（HTTP/gRPC と同列のもう1つの実装）。
+///
+/// A2A の push 抽象（`PushNotificationConfig` 登録・状態変化トリガ・`StreamResponse` payload）は
+/// そのままに、配信だけを HTTP POST ではなく注入された Swift クロージャ（sink）で行う。
+/// in-process ワーカー（`InProcessTransport`）が同一プロセスのホストへ完了イベントを届ける用途。
+public struct InProcessPushNotificationSender: PushNotificationSender {
+    public typealias Sink = @Sendable (_ event: StreamResponse, _ config: TaskPushNotificationConfig) async -> Void
+
+    private let sink: Sink
+
+    public init(sink: @escaping Sink) {
+        self.sink = sink
+    }
+
+    public func send(_ event: StreamResponse, to config: TaskPushNotificationConfig) async {
+        await sink(event, config)
+    }
+}
+
 public actor InMemoryPushNotificationConfigStore: PushNotificationConfigStore {
     /// owner -> taskId -> [config]（a2a-python InMemoryPushNotificationConfigStore）。
     private var configsByOwner: [String: [TaskID: [TaskPushNotificationConfig]]] = [:]

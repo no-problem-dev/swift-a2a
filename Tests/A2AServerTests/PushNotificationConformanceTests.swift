@@ -133,4 +133,43 @@ struct PushNotificationConformanceTests {
         }
         #expect(states.contains(.completed))
     }
+
+    // MARK: - in-process トランスポート
+
+    /// in-process sink へ届いた push を記録する計器。
+    actor SinkRecorder {
+        private(set) var events: [StreamResponse] = []
+        func record(_ event: StreamResponse) { events.append(event) }
+        func sawCompleted() -> Bool {
+            events.contains { r in
+                switch r {
+                case .task(let t): return t.status.state == .completed
+                case .statusUpdate(let u): return u.status.state == .completed
+                default: return false
+                }
+            }
+        }
+    }
+
+    @Test("InProcessPushNotificationSender はワーカー完了を sink へ届ける（HTTP なし）")
+    func inProcessSenderDeliversCompletion() async throws {
+        let recorder = SinkRecorder()
+        let sender = InProcessPushNotificationSender { event, _ in await recorder.record(event) }
+        let store = InMemoryPushNotificationConfigStore()
+        let handler = DefaultRequestHandler(
+            agentCard: card(), executor: WorkThenComplete(),
+            taskStore: InMemoryTaskStore(), queueManager: InMemoryQueueManager(),
+            pushConfigStore: store, pushSender: sender
+        )
+        let taskId = TaskID("inproc-task")
+        let request = SendMessageRequest(
+            message: Message(messageId: MessageID("m1"), role: .user, parts: [.text("go")], taskId: taskId),
+            configuration: SendMessageConfiguration(
+                taskPushNotificationConfig: TaskPushNotificationConfig(url: "inprocess://session", token: "delegation-1"))
+        )
+
+        _ = try await handler.onMessageSend(request, context: ServerCallContext())
+
+        #expect(await recorder.sawCompleted())
+    }
 }
