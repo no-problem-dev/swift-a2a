@@ -180,3 +180,25 @@ extension StreamResponse: Codable {
         }
     }
 }
+
+extension StreamResponse {
+    /// ペイロード（task / message / statusUpdate / artifactUpdate）に含まれる全 `Part` を取り出す。
+    /// a2a-python の Part 抽出ヘルパ群に相当する横断アクセサ。
+    public var parts: [Part] {
+        switch self {
+        case .task(let task):
+            task.artifacts.flatMap(\.parts) + (task.status.message?.parts ?? [])
+        case .message(let message):
+            message.parts
+        case .statusUpdate(let update):
+            update.status.message?.parts ?? []
+        case .artifactUpdate(let update):
+            update.artifact.parts
+        }
+    }
+
+    /// ペイロードの全テキストを結合して返す（a2a-python `get_stream_response_text` 相当）。
+    public func text(delimiter: String = "\n") -> String {
+        parts.compactMap(\.text).joined(separator: delimiter)
+    }
+}
