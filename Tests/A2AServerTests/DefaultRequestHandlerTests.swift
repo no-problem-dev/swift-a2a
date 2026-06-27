@@ -9,7 +9,7 @@ struct EchoExecutor: AgentExecutor {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
         try await updater.submit()
         try await updater.startWork()
-        await updater.addArtifact([.text("echo: \(context.getUserInput())")], name: "echo")
+        await updater.addArtifact([.text("echo: \(context.userInput())")], name: "echo")
         try await updater.complete()
     }
 
@@ -25,9 +25,9 @@ struct InputRequiredExecutor: AgentExecutor {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
         if context.currentTask == nil {
             try await updater.startWork()
-            try await updater.requiresInput(message: updater.newAgentMessage([.text("もっと情報が必要です")]))
+            try await updater.requiresInput(message: updater.makeAgentMessage([.text("もっと情報が必要です")]))
         } else {
-            try await updater.complete(message: updater.newAgentMessage([.text("完了しました")]))
+            try await updater.complete(message: updater.makeAgentMessage([.text("完了しました")]))
         }
     }
 

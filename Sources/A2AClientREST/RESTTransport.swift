@@ -91,7 +91,7 @@ public struct RESTTransport: A2ATransport {
     private func post<Body: Encodable, R: Decodable>(path: String, body: Body) async throws -> R {
         let url = try makeURL(path: path)
         let encoded: Data
-        do { encoded = try A2AJSON.encoder().encode(body) } catch { throw A2AError.encoding(error) }
+        do { encoded = try A2AJSON.makeEncoder().encode(body) } catch { throw A2AError.encoding(error) }
         let request = http.makeRequest(
             url: url, method: "POST",
             contentType: A2AProtocol.a2aJSONContentType, accept: A2AProtocol.a2aJSONContentType,
@@ -104,7 +104,7 @@ public struct RESTTransport: A2ATransport {
     private func stream<Body: Encodable>(path: String, body: Body) async throws -> AsyncThrowingStream<StreamResponse, Error> {
         let url = try makeURL(path: path)
         let encoded: Data
-        do { encoded = try A2AJSON.encoder().encode(body) } catch { throw A2AError.encoding(error) }
+        do { encoded = try A2AJSON.makeEncoder().encode(body) } catch { throw A2AError.encoding(error) }
         let request = http.makeRequest(
             url: url, method: "POST",
             contentType: A2AProtocol.a2aJSONContentType, accept: "text/event-stream",
@@ -117,7 +117,7 @@ public struct RESTTransport: A2ATransport {
 
         return AsyncThrowingStream { continuation in
             let task = Task {
-                let decoder = A2AJSON.decoder()
+                let decoder = A2AJSON.makeDecoder()
                 do {
                     for try await event in SSEParser.events(from: bytes) {
                         // REST は封筒なし。data は StreamResponse そのもの。
@@ -136,14 +136,14 @@ public struct RESTTransport: A2ATransport {
     private func decode<R: Decodable>(_ type: R.Type, data: Data, status: Int) throws -> R {
         guard (200...299).contains(status) else { throw remoteError(data: data, status: status) }
         do {
-            return try A2AJSON.decoder().decode(R.self, from: data)
+            return try A2AJSON.makeDecoder().decode(R.self, from: data)
         } catch {
             throw A2AError.decoding(error)
         }
     }
 
     private func remoteError(data: Data, status: Int) -> A2AError {
-        if let envelope = try? A2AJSON.decoder().decode(RESTErrorEnvelope.self, from: data),
+        if let envelope = try? A2AJSON.makeDecoder().decode(RESTErrorEnvelope.self, from: data),
            let error = envelope.error {
             return .rpc(A2ARemoteError(
                 code: error.code ?? status,

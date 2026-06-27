@@ -291,7 +291,7 @@ public actor DefaultRequestHandler: RequestHandler {
     private func sendPushIfNeeded(_ taskId: TaskID, _ event: StreamResponse) async {
         guard let sender = pushSender, let store = pushConfigStore else { return }
         // 配信は owner 横断（a2a-python sender は get_info_for_dispatch を使う）。
-        guard let configs = try? await store.getForDispatch(taskId: taskId), !configs.isEmpty else { return }
+        guard let configs = try? await store.configs(forDispatch: taskId), !configs.isEmpty else { return }
         for config in configs {
             await sender.send(event, to: config)
         }

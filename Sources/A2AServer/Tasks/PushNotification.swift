@@ -6,13 +6,13 @@ import FoundationNetworking
 
 /// プッシュ通知設定の永続化（a2a-python `PushNotificationConfigStore`）。
 ///
-/// 呼び出し系メソッドは owner ごとにスコープ分離する。配信系（`getForDispatch`）は
+/// 呼び出し系メソッドは owner ごとにスコープ分離する。配信系（`configs(forDispatch:)`）は
 /// owner 横断で全 config を返す（a2a-python `get_info_for_dispatch`）。
 public protocol PushNotificationConfigStore: Sendable {
     func set(_ config: TaskPushNotificationConfig, context: ServerCallContext) async throws -> TaskPushNotificationConfig
     func get(taskId: TaskID, context: ServerCallContext) async throws -> [TaskPushNotificationConfig]
     /// 配信用に owner 横断で全 config を取得（sender が使用）。
-    func getForDispatch(taskId: TaskID) async throws -> [TaskPushNotificationConfig]
+    func configs(forDispatch taskId: TaskID) async throws -> [TaskPushNotificationConfig]
     func delete(taskId: TaskID, configId: String, context: ServerCallContext) async throws
 }
 
@@ -54,7 +54,7 @@ public struct HTTPPushNotificationSender: PushNotificationSender {
 
     public func send(_ event: StreamResponse, to config: TaskPushNotificationConfig) async {
         guard let url = URL(string: config.url) else { return }
-        guard let body = try? A2AJSON.encoder().encode(event) else { return }
+        guard let body = try? A2AJSON.makeEncoder().encode(event) else { return }
         var headers = ["Content-Type": A2AProtocol.jsonContentType]
         if let token = config.token { headers["X-A2A-Notification-Token"] = token }
         try? await post(url, body, headers)
@@ -123,7 +123,7 @@ public actor InMemoryPushNotificationConfigStore: PushNotificationConfigStore {
         configsByOwner[ownerResolver(context)]?[taskId] ?? []
     }
 
-    public func getForDispatch(taskId: TaskID) async throws -> [TaskPushNotificationConfig] {
+    public func configs(forDispatch taskId: TaskID) async throws -> [TaskPushNotificationConfig] {
         configsByOwner.values.compactMap { $0[taskId] }.flatMap { $0 }
     }
 

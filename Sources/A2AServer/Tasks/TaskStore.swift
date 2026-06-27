@@ -20,9 +20,9 @@ public extension TaskStore {
 }
 
 /// `tasks/list` の既定ページサイズ（a2a-python `DEFAULT_LIST_TASKS_PAGE_SIZE`）。
-public let DEFAULT_LIST_TASKS_PAGE_SIZE = 50
+public let defaultListTasksPageSize = 50
 /// `tasks/list` の最大ページサイズ（a2a-python `MAX_LIST_TASKS_PAGE_SIZE`）。
-public let MAX_LIST_TASKS_PAGE_SIZE = 100
+public let maxListTasksPageSize = 100
 
 public actor InMemoryTaskStore: TaskStore {
     /// owner -> taskId -> task（a2a-python `_InMemoryTaskStoreImpl.tasks`）。
@@ -78,7 +78,7 @@ public actor InMemoryTaskStore: TaskStore {
             }
             startIdx = idx
         }
-        let pageSize = (request.pageSize ?? 0) > 0 ? request.pageSize! : DEFAULT_LIST_TASKS_PAGE_SIZE
+        let pageSize = (request.pageSize ?? 0) > 0 ? request.pageSize! : defaultListTasksPageSize
         let endIdx = startIdx + pageSize
         // spec §246 MUST: nextPageToken は常に present、終端は空文字。
         let nextPageToken = endIdx < total ? Self.encodePageToken(result[endIdx].id.rawValue) : ""

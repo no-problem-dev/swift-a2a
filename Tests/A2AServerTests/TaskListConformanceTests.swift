@@ -78,7 +78,7 @@ struct TaskListConformanceTests {
         #expect(page.totalSize == c.totalSize)
         #expect((page.nextPageToken ?? "") == c.nextPageToken)
         // spec/python: response.pageSize は要求値 or 既定(50)
-        let expectedPageSize = (c.request.pageSize ?? 0) > 0 ? c.request.pageSize! : DEFAULT_LIST_TASKS_PAGE_SIZE
+        let expectedPageSize = (c.request.pageSize ?? 0) > 0 ? c.request.pageSize! : defaultListTasksPageSize
         #expect(page.pageSize == expectedPageSize)
     }
 

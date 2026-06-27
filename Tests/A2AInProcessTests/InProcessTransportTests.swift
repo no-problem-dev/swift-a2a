@@ -6,7 +6,7 @@ private struct EchoExecutor: AgentExecutor {
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
         try await updater.startWork()
-        await updater.addArtifact([.text("echo: \(context.getUserInput())")], name: "echo")
+        await updater.addArtifact([.text("echo: \(context.userInput())")], name: "echo")
         try await updater.complete()
     }
     func cancel(_ context: RequestContext, eventQueue: EventQueue) async throws {}
@@ -18,7 +18,7 @@ private struct InputRequiredExecutor: AgentExecutor {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
         if context.currentTask == nil {
             try await updater.startWork()
-            try await updater.requiresInput(message: updater.newAgentMessage([.text("詳細をください")]))
+            try await updater.requiresInput(message: updater.makeAgentMessage([.text("詳細をください")]))
         } else {
             try await updater.complete()
         }

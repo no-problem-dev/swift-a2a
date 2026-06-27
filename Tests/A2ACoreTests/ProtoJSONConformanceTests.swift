@@ -6,8 +6,8 @@ import StructuredDataCore
 /// 公式仕様 v1.0.1 の例に対する ProtoJSON コンフォーマンス検証。
 @Suite("ProtoJSON Conformance")
 struct ProtoJSONConformanceTests {
-    let decoder = A2AJSON.decoder()
-    let encoder = A2AJSON.encoder()
+    let decoder = A2AJSON.makeDecoder()
+    let encoder = A2AJSON.makeEncoder()
 
     func roundTrip<T: Codable & Equatable>(_ value: T) throws -> T {
         try decoder.decode(T.self, from: try encoder.encode(value))

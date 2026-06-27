@@ -10,8 +10,8 @@ import Testing
 /// proto3 寛容デコードを採る本クライアントには該当しないため移植対象外。
 @Suite("Official proto_utils parity (StreamResponse)")
 struct OfficialProtoUtilsTests {
-    let decoder = A2AJSON.decoder()
-    let encoder = A2AJSON.encoder()
+    let decoder = A2AJSON.makeDecoder()
+    let encoder = A2AJSON.makeEncoder()
 
     func wrapperKey(_ value: StreamResponse) throws -> String {
         let data = try encoder.encode(value)

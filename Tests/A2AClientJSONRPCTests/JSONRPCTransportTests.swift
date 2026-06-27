@@ -34,7 +34,7 @@ struct JSONRPCTransportTests {
         let request = captured.value!
         #expect(request.httpMethod == "POST")
         #expect(request.url == endpoint)
-        let json = try A2AJSON.decoder().decode(EnvelopeProbe.self, from: request.capturedBody!)
+        let json = try A2AJSON.makeDecoder().decode(EnvelopeProbe.self, from: request.capturedBody!)
         #expect(json.jsonrpc == "2.0")
         #expect(json.method == "SendMessage")
         #expect(json.params.message.text == "hello")

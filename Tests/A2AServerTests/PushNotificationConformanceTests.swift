@@ -63,7 +63,7 @@ struct PushNotificationConformanceTests {
         #expect(hit.url.absoluteString == "https://hook.example/cb")
         #expect(hit.headers["X-A2A-Notification-Token"] == "secret")
         // payload は StreamResponse（statusUpdate エンベロープ）
-        let decoded = try A2AJSON.decoder().decode(StreamResponse.self, from: hit.body)
+        let decoded = try A2AJSON.makeDecoder().decode(StreamResponse.self, from: hit.body)
         guard case .statusUpdate(let u) = decoded else { Issue.record("expected statusUpdate"); return }
         #expect(u.status.state == .working)
     }
@@ -124,7 +124,7 @@ struct PushNotificationConformanceTests {
         #expect(!hits.isEmpty)
         // 最終的に completed が配信されている
         let states: [TaskState] = hits.compactMap { hit in
-            guard let r = try? A2AJSON.decoder().decode(StreamResponse.self, from: hit.body) else { return nil }
+            guard let r = try? A2AJSON.makeDecoder().decode(StreamResponse.self, from: hit.body) else { return nil }
             switch r {
             case .task(let t): return t.status.state
             case .statusUpdate(let u): return u.status.state

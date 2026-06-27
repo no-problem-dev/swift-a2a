@@ -1,12 +1,12 @@
 import A2ACore
 
 /// JSON-RPC 2.0 の id（文字列 / 数値 / null）。
-public enum JSONRPCID: Codable, Sendable, Hashable {
+enum JSONRPCID: Codable, Sendable, Hashable {
     case string(String)
     case number(Int)
     case null
 
-    public init(from decoder: any Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() {
             self = .null
@@ -19,7 +19,7 @@ public enum JSONRPCID: Codable, Sendable, Hashable {
         }
     }
 
-    public func encode(to encoder: any Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
         case .string(let value): try container.encode(value)

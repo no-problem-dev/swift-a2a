@@ -6,8 +6,8 @@ import Foundation
 /// を呼ぶディスパッチャ（a2a-python `rest_dispatcher`）。HTTP 非依存（`RESTRequest`/`RESTResponse`）。
 public struct RESTHandler: Sendable {
     private let handler: any RequestHandler
-    private let encoder = A2AJSON.encoder()
-    private let decoder = A2AJSON.decoder()
+    private let encoder = A2AJSON.makeEncoder()
+    private let decoder = A2AJSON.makeDecoder()
 
     public init(handler: any RequestHandler) {
         self.handler = handler

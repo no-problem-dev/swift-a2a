@@ -12,7 +12,7 @@ private struct ProgressExecutor: AgentExecutor {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
         try await updater.startWork()
         for step in steps {
-            try await updater.updateStatus(.working, message: updater.newAgentMessage([.text(step)]))
+            try await updater.updateStatus(.working, message: updater.makeAgentMessage([.text(step)]))
         }
         await updater.addArtifact([.text("done")], name: "result")
         try await updater.complete()
@@ -26,7 +26,7 @@ private struct SlowExecutor: AgentExecutor {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
         try await updater.startWork()
         try await Task.sleep(for: .milliseconds(40))
-        try await updater.updateStatus(.working, message: updater.newAgentMessage([.text("halfway")]))
+        try await updater.updateStatus(.working, message: updater.makeAgentMessage([.text("halfway")]))
         try await Task.sleep(for: .milliseconds(40))
         await updater.addArtifact([.text("slow done")], name: "result")
         try await updater.complete()

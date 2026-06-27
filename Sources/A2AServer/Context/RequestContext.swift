@@ -26,7 +26,7 @@ public struct RequestContext: Sendable {
         self.callContext = callContext
     }
 
-    public func getUserInput(delimiter: String = "\n") -> String {
+    public func userInput(delimiter: String = "\n") -> String {
         guard let message else { return "" }
         return message.parts.compactMap(\.text).joined(separator: delimiter)
     }

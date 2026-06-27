@@ -13,8 +13,8 @@ public enum JSONRPCOutcome: Sendable {
 /// （a2a-python `JsonRpcDispatcher`）。HTTP 非依存（`Data` 入出力）。
 public struct JSONRPCHandler: Sendable {
     private let handler: any RequestHandler
-    private let encoder = A2AJSON.encoder()
-    private let decoder = A2AJSON.decoder()
+    private let encoder = A2AJSON.makeEncoder()
+    private let decoder = A2AJSON.makeDecoder()
 
     public init(handler: any RequestHandler) {
         self.handler = handler

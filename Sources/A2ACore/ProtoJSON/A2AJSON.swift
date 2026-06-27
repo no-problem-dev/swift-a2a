@@ -8,7 +8,7 @@ import Foundation
 /// `bytes`（Base64）は Foundation 既定の Base64 戦略でそのまま扱えます。
 public enum A2AJSON {
     /// A2A JSON を復号する `JSONDecoder`。
-    public static func decoder() -> JSONDecoder {
+    public static func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
@@ -25,7 +25,7 @@ public enum A2AJSON {
     }
 
     /// A2A JSON を符号化する `JSONEncoder`。
-    public static func encoder() -> JSONEncoder {
+    public static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .custom { date, encoder in
             var container = encoder.singleValueContainer()

@@ -8,7 +8,7 @@ private struct EchoExecutor: AgentExecutor {
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
         try await updater.startWork()
-        await updater.addArtifact([.text("echo: \(context.getUserInput())")], name: "echo")
+        await updater.addArtifact([.text("echo: \(context.userInput())")], name: "echo")
         try await updater.complete()
     }
     func cancel(_ context: RequestContext, eventQueue: EventQueue) async throws {}
@@ -38,8 +38,8 @@ private func userMessage(_ text: String) -> Message {
 
 @Suite("RESTHandler")
 struct RESTHandlerTests {
-    let encoder = A2AJSON.encoder()
-    let decoder = A2AJSON.decoder()
+    let encoder = A2AJSON.makeEncoder()
+    let decoder = A2AJSON.makeDecoder()
 
     @Test("POST /message:send は封筒なしの completed タスクを 200 で返す")
     func messageSend() async throws {

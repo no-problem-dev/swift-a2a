@@ -57,7 +57,7 @@ public actor TaskUpdater {
         await eventQueue.enqueue(.artifactUpdate(event))
     }
 
-    public func newAgentMessage(_ parts: [Part], metadata: A2AMetadata? = nil) -> Message {
+    public func makeAgentMessage(_ parts: [Part], metadata: A2AMetadata? = nil) -> Message {
         Message(
             messageId: MessageID(UUID().uuidString),
             role: .agent,
@@ -80,7 +80,7 @@ public actor TaskUpdater {
         try await updateStatus(.completed, message: message)
     }
 
-    public func failed(message: Message? = nil) async throws {
+    public func fail(message: Message? = nil) async throws {
         try await updateStatus(.failed, message: message)
     }
 

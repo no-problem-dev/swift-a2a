@@ -70,7 +70,7 @@ struct OwnerScopingTests {
         #expect(try await store.get(taskId: taskId, context: bob).map(\.id) == ["b"])
 
         // 配信系は owner 横断で全件
-        let dispatch = try await store.getForDispatch(taskId: taskId)
+        let dispatch = try await store.configs(forDispatch: taskId)
         #expect(Set(dispatch.map(\.id)) == ["a", "b"])
     }
 }

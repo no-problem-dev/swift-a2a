@@ -79,7 +79,7 @@ public struct JSONRPCTransport: A2ATransport {
     private func encodeRequest<P: Encodable>(_ method: String, _ params: P) throws -> Data {
         let envelope = JSONRPCRequest(id: UUID().uuidString, method: method, params: params)
         do {
-            return try A2AJSON.encoder().encode(envelope)
+            return try A2AJSON.makeEncoder().encode(envelope)
         } catch {
             throw A2AError.encoding(error)
         }
@@ -96,7 +96,7 @@ public struct JSONRPCTransport: A2ATransport {
 
         let envelope: JSONRPCResponse<R>
         do {
-            envelope = try A2AJSON.decoder().decode(JSONRPCResponse<R>.self, from: data)
+            envelope = try A2AJSON.makeDecoder().decode(JSONRPCResponse<R>.self, from: data)
         } catch {
             if !(200...299).contains(response.statusCode) {
                 throw A2AError.http(status: response.statusCode, body: String(data: data, encoding: .utf8))
@@ -122,7 +122,7 @@ public struct JSONRPCTransport: A2ATransport {
             throw A2AError.http(status: response.statusCode, body: String(data: data, encoding: .utf8))
         }
         // 結果が空でも error フィールドのみ確認する。
-        if let envelope = try? A2AJSON.decoder().decode(JSONRPCResponse<StructuredValue>.self, from: data),
+        if let envelope = try? A2AJSON.makeDecoder().decode(JSONRPCResponse<StructuredValue>.self, from: data),
            let error = envelope.error {
             throw A2AError.rpc(A2ARemoteError(code: error.code, message: error.message, details: error.data ?? []))
         }
@@ -142,7 +142,7 @@ public struct JSONRPCTransport: A2ATransport {
 
         return AsyncThrowingStream { continuation in
             let task = Task {
-                let decoder = A2AJSON.decoder()
+                let decoder = A2AJSON.makeDecoder()
                 do {
                     for try await event in SSEParser.events(from: bytes) {
                         let eventData = Data(event.data.utf8)

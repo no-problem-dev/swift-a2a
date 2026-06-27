@@ -119,7 +119,7 @@ public struct A2AClient: Sendable {
             throw A2AError.http(status: response.statusCode, body: String(data: data, encoding: .utf8))
         }
         do {
-            return try A2AJSON.decoder().decode(AgentCard.self, from: data)
+            return try A2AJSON.makeDecoder().decode(AgentCard.self, from: data)
         } catch {
             throw A2AError.decoding(error)
         }

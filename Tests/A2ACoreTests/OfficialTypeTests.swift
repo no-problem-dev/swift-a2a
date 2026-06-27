@@ -7,8 +7,8 @@ import StructuredDataCore
 /// fixture と assertion を移植し、proto3 セマンティクスへの一致を検証する。
 @Suite("Official type parity (test_types.py)")
 struct OfficialTypeTests {
-    let decoder = A2AJSON.decoder()
-    let encoder = A2AJSON.encoder()
+    let decoder = A2AJSON.makeDecoder()
+    let encoder = A2AJSON.makeEncoder()
 
     /// エンコード結果のトップレベルキー集合（MessageToDict の default 省略検証用）。
     func topLevelKeys<T: Encodable>(_ value: T) throws -> Set<String> {
