@@ -33,7 +33,8 @@ jobs:
         run: |
           swift package --allow-writing-to-directory ./docs \
             generate-documentation \
-            --target A2ACore \
+            --enable-experimental-combined-documentation \
+            --target A2ACore --target A2AClientREST --target A2AClientJSONRPC --target A2AServer --target A2AServerJSONRPC --target A2AServerREST --target A2AInProcess \
             --disable-indexing \
             --transform-for-static-hosting \
             --hosting-base-path swift-a2a \
