@@ -27,6 +27,7 @@ let package = Package(
         .library(name: "A2AInProcess", targets: ["A2AInProcess"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0"),
         .package(url: "https://github.com/no-problem-dev/swift-structured-data.git", from: "1.3.0"),
     ],
     targets: [
