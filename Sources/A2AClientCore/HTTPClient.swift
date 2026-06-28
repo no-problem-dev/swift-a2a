@@ -4,7 +4,7 @@ import A2ACore
 import FoundationNetworking
 #endif
 
-/// バインディング横断の HTTP 基盤。認証・A2A ヘッダ付与・送信・SSE ストリームを提供します。
+/// バインディング横断の HTTP 基盤。認証・A2A ヘッダ付与・送信・SSE ストリームを提供する。
 public struct HTTPClient: Sendable {
     public let configuration: A2AClientConfiguration
     private let session: URLSession

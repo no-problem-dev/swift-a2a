@@ -3,9 +3,9 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// Server-Sent Events パーサー。`URLSession.AsyncBytes` を直接消費し、イベント境界（空行）を確実に検出します。
+/// Server-Sent Events パーサー。`URLSession.AsyncBytes` を直接消費し、イベント境界（空行）を確実に検出する。
 ///
-/// `AsyncLineSequence` は空行を取りこぼすことがあるため、バイト列から行を組み立てて解析します。
+/// `AsyncLineSequence` は空行を取りこぼすことがあるため、バイト列から行を組み立てて解析する。
 public struct SSEParser: Sendable {
     /// 1 件の SSE イベント。
     public struct Event: Sendable {
@@ -15,7 +15,7 @@ public struct SSEParser: Sendable {
         public let retry: Int?
     }
 
-    /// バイトストリームから SSE イベントを非同期に解析します。
+    /// バイトストリームから SSE イベントを非同期に解析する。
     public static func events(
         from bytes: URLSession.AsyncBytes
     ) -> AsyncThrowingStream<Event, Error> {

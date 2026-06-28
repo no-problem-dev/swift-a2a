@@ -20,6 +20,9 @@ public struct ServerCallContext: Sendable {
     }
 }
 
+/// リクエストの認証済みユーザ情報。
+///
+/// `isAuthenticated` が認証の可否を示し、`username` はオプションのユーザ識別子。
 public struct ServerUser: Sendable, Hashable {
     public var isAuthenticated: Bool
     public var username: String?

@@ -3,7 +3,7 @@
 /// エージェントのエンドポイントを保護するセキュリティスキーム（A2A `SecurityScheme`、oneof）。
 ///
 /// v1.0 ProtoJSON では判別子フィールドを持たず、JSON のメンバ名
-/// （`apiKeySecurityScheme` 等）で種別が表されます（§8.5 のサンプルに準拠）。
+/// （`apiKeySecurityScheme` 等）で種別が表される（§8.5 のサンプルに準拠）。
 public enum SecurityScheme: Sendable, Hashable {
     case apiKey(APIKeySecurityScheme)
     case httpAuth(HTTPAuthSecurityScheme)
@@ -122,8 +122,8 @@ public struct MutualTLSSecurityScheme: Codable, Sendable, Hashable {
 
 /// 対応する OAuth 2.0 フロー群（A2A `OAuthFlows`）。
 ///
-/// proto 上は oneof（同時に1フロー）ですが、現実のカードが複数フローを併記する
-/// OpenAPI 慣習にも耐えられるよう、各フローを任意フィールドとして保持します。
+/// proto 上は oneof（同時に1フロー）だが、現実のカードが複数フローを併記する
+/// OpenAPI 慣習にも耐えられるよう、各フローを任意フィールドとして保持する。
 public struct OAuthFlows: Codable, Sendable, Hashable {
     public var authorizationCode: AuthorizationCodeOAuthFlow?
     public var clientCredentials: ClientCredentialsOAuthFlow?
@@ -320,7 +320,7 @@ public struct DeviceCodeOAuthFlow: Codable, Sendable, Hashable {
 
 /// セキュリティ要件: スキーム名 → 必要スコープ一覧。
 ///
-/// 注: proto は `map<string, StringList>`（`{"scheme":{"list":[...]}}`）と定義しますが、
+/// 注: proto は `map<string, StringList>`（`{"scheme":{"list":[...]}}`）と定義するが、
 /// 仕様書 §8.5 のサンプルおよび実エコシステムは OpenAPI 慣習のフラット形
-/// （`{"scheme":["scope"]}`）を用いるため、相互運用性を優先しフラット形を採用します。
+/// （`{"scheme":["scope"]}`）を用いるため、相互運用性を優先しフラット形を採用する。
 public typealias SecurityRequirement = [String: [String]]

@@ -1,6 +1,6 @@
 import Foundation
 
-/// A2A の中心的な作業単位（A2A `Task`）。現在の状態・成果物・対話履歴を保持します。
+/// A2A の中心的な作業単位（A2A `Task`）。現在の状態・成果物・対話履歴を保持する。
 public struct A2ATask: Sendable, Hashable {
     /// タスクの一意識別子（サーバが採番）。
     public var id: TaskID

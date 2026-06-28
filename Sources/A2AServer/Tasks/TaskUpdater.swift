@@ -15,6 +15,13 @@ public actor TaskUpdater {
         self.contextId = contextId
     }
 
+    /// タスク状態を `state` に更新し、`EventQueue` に enqueue する。
+    ///
+    /// 終端状態（completed/failed/canceled/rejected）到達後に再呼び出しするとエラーになる。
+    /// - Parameters:
+    ///   - state: 設定する `TaskState`。
+    ///   - message: 状態に添付するメッセージ（省略可）。
+    ///   - metadata: 拡張メタデータ（省略可）。
     public func updateStatus(
         _ state: TaskState,
         message: Message? = nil,
@@ -31,6 +38,15 @@ public actor TaskUpdater {
         await eventQueue.enqueue(.statusUpdate(event))
     }
 
+    /// アーティファクト更新イベントを生成して `EventQueue` に enqueue する。
+    /// - Parameters:
+    ///   - parts: アーティファクトのコンテンツパーツ。
+    ///   - artifactId: アーティファクト ID（省略時は UUID 自動生成）。
+    ///   - name: アーティファクト名（省略可）。
+    ///   - description: 説明（省略可）。
+    ///   - append: 既存アーティファクトへの追記モードにする場合 `true`。
+    ///   - lastChunk: ストリーミング最終チャンクの場合 `true`。
+    ///   - metadata: 拡張メタデータ（省略可）。
     public func addArtifact(
         _ parts: [Part],
         artifactId: ArtifactID = ArtifactID(UUID().uuidString),
@@ -68,34 +84,42 @@ public actor TaskUpdater {
         )
     }
 
+    /// 状態を `.submitted` に更新する。`updateStatus(.submitted)` の略記。
     public func submit(message: Message? = nil) async throws {
         try await updateStatus(.submitted, message: message)
     }
 
+    /// 状態を `.working` に更新する。`updateStatus(.working)` の略記。
     public func startWork(message: Message? = nil) async throws {
         try await updateStatus(.working, message: message)
     }
 
+    /// 状態を `.completed` に更新する（終端状態）。`updateStatus(.completed)` の略記。
     public func complete(message: Message? = nil) async throws {
         try await updateStatus(.completed, message: message)
     }
 
+    /// 状態を `.failed` に更新する（終端状態）。`updateStatus(.failed)` の略記。
     public func fail(message: Message? = nil) async throws {
         try await updateStatus(.failed, message: message)
     }
 
+    /// 状態を `.rejected` に更新する（終端状態）。`updateStatus(.rejected)` の略記。
     public func reject(message: Message? = nil) async throws {
         try await updateStatus(.rejected, message: message)
     }
 
+    /// 状態を `.canceled` に更新する（終端状態）。`updateStatus(.canceled)` の略記。
     public func cancel(message: Message? = nil) async throws {
         try await updateStatus(.canceled, message: message)
     }
 
+    /// 状態を `.inputRequired` に更新する（中断状態。入力受信後に framework が再 `execute` を呼ぶ）。
     public func requiresInput(message: Message? = nil) async throws {
         try await updateStatus(.inputRequired, message: message)
     }
 
+    /// 状態を `.authRequired` に更新する（中断状態）。
     public func requiresAuth(message: Message? = nil) async throws {
         try await updateStatus(.authRequired, message: message)
     }

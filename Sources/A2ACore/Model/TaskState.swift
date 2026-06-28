@@ -1,6 +1,6 @@
 /// タスクのライフサイクル状態（A2A `TaskState`）。
 ///
-/// ProtoJSON では `TASK_STATE_SUBMITTED` などとして表現されます。
+/// ProtoJSON では `TASK_STATE_SUBMITTED` などとして表現される。
 public enum TaskState: String, ProtoEnum {
     /// 未指定・不定（未知値のフォールバック先）。
     case unspecified = "TASK_STATE_UNSPECIFIED"

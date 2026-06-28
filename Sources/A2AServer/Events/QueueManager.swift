@@ -2,9 +2,13 @@ import A2ACore
 
 /// タスク ID ごとの `EventQueue` を管理する（a2a-python `QueueManager`）。streaming と subscribe で共有。
 public protocol QueueManager: Sendable {
+    /// 指定タスク ID の `EventQueue` を登録する。
     func add(_ taskId: TaskID, queue: EventQueue) async
+    /// 指定タスク ID の `EventQueue` を返す。未登録なら `nil`。
     func get(_ taskId: TaskID) async -> EventQueue?
+    /// キューを閉じ、登録を解除する。
     func close(_ taskId: TaskID) async
+    /// 既存のキューがあればそれを返し、なければ新規作成して登録・返す。
     func createOrGet(_ taskId: TaskID) async -> EventQueue
 }
 

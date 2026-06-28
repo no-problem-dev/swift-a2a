@@ -1,6 +1,6 @@
 /// タスクのプッシュ通知設定（A2A `TaskPushNotificationConfig`）。
 ///
-/// v1.0 で旧 `PushNotificationConfig` と統合され、タスク ID・設定 ID を含む単一の型になりました。
+/// v1.0 で旧 `PushNotificationConfig` と統合され、タスク ID・設定 ID を含む単一の型になった。
 public struct TaskPushNotificationConfig: Sendable, Hashable {
     /// ルーティング用の不透明識別子（`AgentInterface.tenant` と一致させる）。
     public var tenant: String?

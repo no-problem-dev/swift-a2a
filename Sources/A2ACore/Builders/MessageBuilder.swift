@@ -2,7 +2,7 @@ import Foundation
 
 /// パート列を宣言的に組み立てる Result Builder。
 ///
-/// 文字列リテラルは自動的にテキストパートになります。
+/// 文字列リテラルは自動的にテキストパートになる。
 ///
 /// ```swift
 /// let message = Message(role: .user) {

@@ -7,6 +7,12 @@ import A2ACore
 /// publish して return すること。input-required の場合、入力到来時に framework が再度 `execute`
 /// を呼ぶ。`execute` が throw すると framework がタスクを失敗状態へ遷移させる。
 public protocol AgentExecutor: Sendable {
+    /// `context` を読み、終端状態（または中断状態）まで `eventQueue` へ publish して return する。
+    ///
+    /// throw すると framework がタスクを `.failed` へ遷移させる。
+    /// - Parameters:
+    ///   - context: リクエスト情報・ユーザ・拡張情報を含むコンテキスト。
+    ///   - eventQueue: ステータス更新・アーティファクトを publish するキュー。
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws
 
     /// 進行中タスクを停止し、`TaskState.canceled` を publish する。

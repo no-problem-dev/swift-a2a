@@ -1,6 +1,6 @@
 /// 型付き ID。生の `String` を取り違えないための薄いラッパ。
 ///
-/// JSON 上は素の文字列として透過的に符号化されます。
+/// JSON 上は素の文字列として透過的に符号化される。
 public protocol A2AIdentifier: RawRepresentable, Codable, Sendable, Hashable,
     ExpressibleByStringLiteral, CustomStringConvertible
 where RawValue == String {

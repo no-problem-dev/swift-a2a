@@ -2,7 +2,7 @@ import Foundation
 import A2ACore
 import A2AClientCore
 
-/// HTTP+JSON / REST バインディング（仕様 §11）。リソース URL と標準 HTTP 動詞を使い、封筒を持ちません。
+/// HTTP+JSON / REST バインディング（仕様 §11）。リソース URL と標準 HTTP 動詞を使い、封筒を持たない。
 public struct RESTTransport: A2ATransport {
     private let http: HTTPClient
     private let baseURL: URL

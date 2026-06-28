@@ -1,23 +1,23 @@
 # ``A2AServerJSONRPC``
 
-JSON-RPC 2.0 server-side dispatcher for the A2A protocol — decodes JSON-RPC envelopes, dispatches to a `RequestHandler`, and encodes responses back to raw bytes.
+A2A プロトコルの JSON-RPC 2.0 サーバ側ディスパッチャ — JSON-RPC 封筒をデコードし `RequestHandler` へディスパッチして、レスポンスを生バイト列にエンコードして返す。
 
 ## Overview
 
-`A2AServerJSONRPC` is the thin protocol-translation layer that sits between your HTTP server and the transport-independent `A2AServer` framework. It is intentionally HTTP-library-agnostic: it receives a `Data` blob and returns a ``JSONRPCOutcome``, which is either a single ``JSONRPCOutcome/unary(_:)`` `Data` value or a ``JSONRPCOutcome/stream(_:)`` of `Data` values (one per SSE frame). Your HTTP framework is responsible for writing those bytes to the response body.
+`A2AServerJSONRPC` は HTTP サーバとトランスポート非依存の `A2AServer` フレームワークの間に位置する薄いプロトコル変換層。意図的に HTTP ライブラリ非依存で設計されており、`Data` ブロブを受け取り ``JSONRPCOutcome`` を返す。`JSONRPCOutcome` は単一の ``JSONRPCOutcome/unary(_:)`` `Data` 値か、SSE フレームごとに 1 つの ``JSONRPCOutcome/stream(_:)`` `Data` 値のストリームのいずれか。そのバイト列をレスポンスボディへ書き込む責任は HTTP フレームワーク側にある。
 
-Create a ``JSONRPCHandler`` with any `RequestHandler` and call ``JSONRPCHandler/handle(_:context:)`` for each incoming request. The handler routes by the `method` field (for example `SendMessage`, `GetTask`, `SubscribeToTask`) to the matching `RequestHandler` method, wraps the result in a standard `{jsonrpc: "2.0", id, result}` envelope, and returns the encoded bytes:
+任意の `RequestHandler` を使って ``JSONRPCHandler`` を生成し、受信リクエストごとに ``JSONRPCHandler/handle(_:context:)`` を呼び出す。ハンドラは `method` フィールド（例: `SendMessage`・`GetTask`・`SubscribeToTask`）でルーティングし、対応する `RequestHandler` メソッドへ委譲。結果を標準の `{jsonrpc: "2.0", id, result}` 封筒にラップしてエンコードしたバイト列を返す:
 
 ```swift
 import A2ACore
 import A2AServer
 import A2AServerJSONRPC
 
-// Compose with any RequestHandler from A2AServer
+// A2AServer の任意の RequestHandler と組み合わせる
 let handler = DefaultRequestHandler(agentCard: card, executor: myExecutor)
 let rpcHandler = JSONRPCHandler(handler: handler)
 
-// In your HTTP route handler (pseudo-code):
+// HTTP ルートハンドラ内（疑似コード）:
 let requestData: Data = httpRequest.body
 let outcome = await rpcHandler.handle(requestData)
 
@@ -33,7 +33,7 @@ case .stream(let events):
 
 ## Topics
 
-### Dispatching
+### ディスパッチング
 
 - ``JSONRPCHandler``
 - ``JSONRPCOutcome``

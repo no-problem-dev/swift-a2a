@@ -6,9 +6,9 @@ import FoundationNetworking
 
 /// A2A エージェントと通信する高水準クライアント。
 ///
-/// バインディング非依存のファサードで、具体的な通信は注入された ``A2ATransport`` が担います。
+/// バインディング非依存のファサードで、具体的な通信は注入された ``A2ATransport`` が担う。
 /// 通常は `A2AClientREST` / `A2AClientJSONRPC` が提供する `A2AClient.rest(...)` /
-/// `A2AClient.jsonRPC(...)` ファクトリ経由で生成します。
+/// `A2AClient.jsonRPC(...)` ファクトリ経由で生成する。
 public struct A2AClient: Sendable {
     public let configuration: A2AClientConfiguration
     public let transport: any A2ATransport

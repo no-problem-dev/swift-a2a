@@ -1,9 +1,9 @@
 import A2ACore
 
-/// A2A の抽象操作を表すトランスポート。JSON-RPC / REST / gRPC などのバインディングが実装します。
+/// A2A の抽象操作を表すトランスポート。JSON-RPC / REST / gRPC などのバインディングが実装する。
 ///
 /// 操作とデータモデルはバインディング非依存で、各実装が具体的な HTTP マッピング・封筒・
-/// エラー表現を担います（仕様 §5.1 の機能的等価性）。
+/// エラー表現を担う（仕様 §5.1 の機能的等価性）。
 public protocol A2ATransport: Sendable {
     /// メッセージを送信（非ストリーミング）。
     func sendMessage(_ request: SendMessageRequest) async throws -> SendMessageResponse

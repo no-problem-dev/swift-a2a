@@ -4,8 +4,8 @@ import StructuredDataCore
 /// メッセージ／アーティファクトを構成するコンテンツ片（A2A `Part`）。
 ///
 /// v1.0 では判別子フィールド（旧 `type`/`kind`）を持たず、コンテンツ種別は
-/// JSON のメンバ名（`text` / `raw` / `url` / `data`）で表されます。`filename`・
-/// `mediaType`・`metadata` はコンテンツ種別と並列の任意フィールドです。
+/// JSON のメンバ名（`text` / `raw` / `url` / `data`）で表される。`filename`・
+/// `mediaType`・`metadata` はコンテンツ種別と並列の任意フィールド。
 public struct Part: Sendable, Hashable {
     /// コンテンツ本体（oneof）。
     public enum Content: Sendable, Hashable {

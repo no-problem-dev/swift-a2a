@@ -1,16 +1,16 @@
 # ``A2ACore``
 
-Swift implementation of the Agent-to-Agent (A2A) protocol — shared data model, operation types, and protocol constants used by every module in the swift-a2a package.
+A2A プロトコルの Swift 実装 — swift-a2a パッケージ全モジュールが共有するデータモデル・操作型・プロトコル定数。
 
 ## Overview
 
-swift-a2a is a modular Swift implementation of Google's Agent-to-Agent (A2A) protocol (v1.0.1). The package is split into seven libraries so you can adopt only the layers you need. ``A2ACore`` is the shared foundation: it defines the complete A2A data model — tasks, messages, parts, artifacts, and agent cards — together with the full set of operation request and response types, stream-event types, and the JSON codec. Every other library in this package depends on ``A2ACore``.
+swift-a2a は Google の Agent-to-Agent（A2A）プロトコル（v1.0.1）をモジュール形式で実装した Swift ライブラリ。必要な層だけを導入できるよう 7 つのライブラリに分割されており、``A2ACore`` はその共有基盤。タスク・メッセージ・パート・アーティファクト・Agent Card からなる完全な A2A データモデル、操作リクエスト／レスポンス型全種、ストリームイベント型、JSON コーデックを定義する。他のすべてのライブラリは ``A2ACore`` に依存する。
 
-The client-side libraries `A2AClientREST` and `A2AClientJSONRPC` each wrap the shared `A2AClient` façade with a concrete transport binding. `A2AClientREST` uses the HTTP+JSON REST binding (spec §11) while `A2AClientJSONRPC` uses the JSON-RPC 2.0 binding (spec §9). Both modules re-export ``A2ACore``, so a single import statement gives you everything needed to build and send messages.
+クライアント側ライブラリ `A2AClientREST` と `A2AClientJSONRPC` はそれぞれ、共有の `A2AClient` ファサードに具体的なトランスポートバインディングを組み合わせる。`A2AClientREST` は HTTP+JSON REST バインディング（仕様 §11）、`A2AClientJSONRPC` は JSON-RPC 2.0 バインディング（仕様 §9）を使用する。両モジュールは ``A2ACore`` を再エクスポートするため、1 つの import 文でメッセージの構築・送信に必要なものがすべて揃う。
 
-The server-side is handled by three complementary libraries. `A2AServer` provides the transport-independent framework: the `AgentExecutor` and `RequestHandler` protocols, the `TaskManager` actor for lifecycle management, and in-memory store implementations for quick prototyping. `A2AServerREST` and `A2AServerJSONRPC` add thin HTTP-independent dispatchers that translate raw bytes into `RequestHandler` calls. Finally, `A2AInProcess` connects an `A2AClient` directly to a `RequestHandler` in the same process without any networking, which makes it easy to write unit tests against a real agent implementation.
+サーバ側は 3 つの補完ライブラリで構成される。`A2AServer` はトランスポート非依存フレームワークを提供し、`AgentExecutor` と `RequestHandler` プロトコル、ライフサイクル管理を担う `TaskManager` actor、プロトタイピング向けのインメモリストア実装を含む。`A2AServerREST` と `A2AServerJSONRPC` はそれぞれ、生バイト列を `RequestHandler` 呼び出しに変換する薄い HTTP 非依存ディスパッチャを追加する。最後に `A2AInProcess` は、`A2AClient` を同一プロセス内の `RequestHandler` へ直結させ、ネットワーク通信なしに動作させる。これにより実際のエージェント実装に対してユニットテストを書くのが容易になる。
 
-The following example creates a text message using ``Message/user(_:messageId:)`` and inspects the result returned by a remote agent via the REST client:
+次の例では ``Message/user(_:messageId:)`` でテキストメッセージを作成し、REST クライアントを通じてリモートエージェントの結果を検査する:
 
 ```swift
 import A2ACore
@@ -18,24 +18,24 @@ import A2AClientREST
 
 let client = A2AClient.rest(baseURL: URL(string: "https://agent.example.com")!)
 
-let message = Message.user("Summarise the attached document.")
+let message = Message.user("添付ドキュメントを要約して。")
 let response = try await client.sendMessage(message)
 
 switch response {
 case .task(let task):
-    print("Task created:", task.id.rawValue, "state:", task.status.state)
+    print("タスク作成:", task.id.rawValue, "状態:", task.status.state)
 case .message(let reply):
-    print("Immediate reply:", reply.text)
+    print("即時返信:", reply.text)
 }
 ```
 
 ## Topics
 
-### Protocol Constants
+### プロトコル定数
 
 - ``A2AProtocol``
 
-### Data Model — Tasks
+### データモデル — タスク
 
 - ``A2ATask``
 - ``TaskStatus``
@@ -43,7 +43,7 @@ case .message(let reply):
 - ``TaskID``
 - ``ContextID``
 
-### Data Model — Messages & Parts
+### データモデル — メッセージとパート
 
 - ``Message``
 - ``Part``
@@ -51,12 +51,12 @@ case .message(let reply):
 - ``Role``
 - ``MessageID``
 
-### Data Model — Artifacts
+### データモデル — アーティファクト
 
 - ``Artifact``
 - ``ArtifactID``
 
-### Data Model — Agent Card
+### データモデル — Agent Card
 
 - ``AgentCard``
 - ``AgentSkill``
@@ -66,7 +66,7 @@ case .message(let reply):
 - ``AgentExtension``
 - ``AgentCardSignature``
 
-### Data Model — Security Schemes
+### データモデル — セキュリティスキーム
 
 - ``SecurityScheme``
 - ``APIKeySecurityScheme``
@@ -81,12 +81,12 @@ case .message(let reply):
 - ``PasswordOAuthFlow``
 - ``DeviceCodeOAuthFlow``
 
-### Data Model — Push Notifications
+### データモデル — プッシュ通知
 
 - ``TaskPushNotificationConfig``
 - ``AuthenticationInfo``
 
-### Operations
+### 操作
 
 - ``SendMessageRequest``
 - ``SendMessageConfiguration``
@@ -102,17 +102,17 @@ case .message(let reply):
 - ``ListTaskPushNotificationConfigsResponse``
 - ``GetExtendedAgentCardRequest``
 
-### Streaming Events
+### ストリーミングイベント
 
 - ``StreamResponse``
 - ``TaskStatusUpdateEvent``
 - ``TaskArtifactUpdateEvent``
 
-### Identifiers
+### 識別子
 
 - ``A2AIdentifier``
 
-### JSON Codec & Metadata
+### JSON コーデックとメタデータ
 
 - ``A2AJSON``
 - ``A2AMetadata``

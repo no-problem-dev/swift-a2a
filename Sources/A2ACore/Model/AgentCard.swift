@@ -2,7 +2,7 @@
 
 /// エージェントの自己記述マニフェスト（A2A `AgentCard`）。
 ///
-/// 通常 `https://{host}/.well-known/agent-card.json` で公開されます。
+/// 通常 `https://{host}/.well-known/agent-card.json` で公開される。
 public struct AgentCard: Sendable, Hashable {
     /// 人間可読なエージェント名。
     public var name: String

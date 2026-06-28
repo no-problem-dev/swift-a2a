@@ -1,12 +1,12 @@
 # ``A2AClientJSONRPC``
 
-JSON-RPC 2.0 binding for the A2A client — adds the `A2AClient.jsonRPC(endpoint:)` factory and the underlying `JSONRPCTransport`.
+A2A クライアントの JSON-RPC 2.0 バインディング — `A2AClient.jsonRPC(endpoint:)` ファクトリと内部の `JSONRPCTransport` を追加する。
 
 ## Overview
 
-`A2AClientJSONRPC` provides the JSON-RPC binding described in section 9 of the A2A specification. Like its REST sibling `A2AClientREST`, importing this module re-exports the full `A2AClient` façade and the `A2ACore` data model, so no additional imports are needed.
+`A2AClientJSONRPC` は A2A 仕様 §9 の JSON-RPC バインディングを実装する。REST バインディングの `A2AClientREST` と同様に、このモジュールを import すると完全な `A2AClient` ファサードと `A2ACore` データモデルが再エクスポートされるため、追加の import は不要。
 
-Create a client by calling the `A2AClient.jsonRPC(endpoint:authentication:)` factory. This wires a ``JSONRPCTransport`` — which POSTs all requests to a single endpoint URL with method names such as `SendMessage`, `GetTask`, and `SubscribeToTask` — to the shared `A2AClient` façade.
+`A2AClient.jsonRPC(endpoint:authentication:)` ファクトリを呼び出してクライアントを生成する。内部では ``JSONRPCTransport`` が共有の `A2AClient` ファサードと組み合わされる。このトランスポートは `SendMessage`・`GetTask`・`SubscribeToTask` などのメソッド名で単一エンドポイント URL へすべてのリクエストを POST する。
 
 ```swift
 import A2AClientJSONRPC
@@ -16,21 +16,21 @@ let client = A2AClient.jsonRPC(
     authentication: .bearer("my-token")
 )
 
-// Retrieve a known task by ID
+// 既知のタスクを ID で取得
 let task = try await client.getTask(TaskID("abc-123"))
-print("State:", task.status.state)
+print("状態:", task.status.state)
 
-// Subscribe to updates for a running task
+// 実行中タスクの更新を購読
 let updates = try await client.subscribeToTask(TaskID("abc-123"))
 for try await event in updates {
     print(event)
 }
 ```
 
-``JSONRPCTransport`` is publicly accessible for cases where you want to compose it with a custom `HTTPClient`.
+``JSONRPCTransport`` は public 型として公開されており、独自の `HTTPClient` と組み合わせることもできる。
 
 ## Topics
 
-### Transport
+### トランスポート
 
 - ``JSONRPCTransport``

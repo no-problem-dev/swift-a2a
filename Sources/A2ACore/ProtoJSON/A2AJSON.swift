@@ -3,9 +3,9 @@ import Foundation
 /// A2A の ProtoJSON 表現を読み書きするための正準コーダ。
 ///
 /// A2A データモデルの JSON は通常の `JSONEncoder`/`JSONDecoder` 既定設定では
-/// タイムスタンプを正しく扱えません（既定の日付戦略は数値）。本ファクトリは
-/// 仕様 §5.6.1 の RFC 3339 文字列でタイムスタンプを符号化／復号する設定済みコーダを返します。
-/// `bytes`（Base64）は Foundation 既定の Base64 戦略でそのまま扱えます。
+/// タイムスタンプを正しく扱えない（既定の日付戦略は数値）。本ファクトリは
+/// 仕様 §5.6.1 の RFC 3339 文字列でタイムスタンプを符号化／復号する設定済みコーダを返す。
+/// `bytes`（Base64）は Foundation 既定の Base64 戦略でそのまま扱える。
 public enum A2AJSON {
     /// A2A JSON を復号する `JSONDecoder`。
     public static func makeDecoder() -> JSONDecoder {

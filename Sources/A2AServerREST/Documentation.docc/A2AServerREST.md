@@ -1,12 +1,12 @@
 # ``A2AServerREST``
 
-REST server-side dispatcher for the A2A protocol — routes HTTP method and path to a `RequestHandler` and returns typed request/response values that your HTTP framework writes to the wire.
+A2A プロトコルの REST サーバ側ディスパッチャ — HTTP メソッドとパスを `RequestHandler` へルーティングし、HTTP フレームワークがワイヤへ書き込む型付きリクエスト/レスポンス値を返す。
 
 ## Overview
 
-`A2AServerREST` is the transport-translation layer for the HTTP+JSON REST binding described in section 11 of the A2A specification. Like `A2AServerJSONRPC`, it is HTTP-library-agnostic: it accepts a ``RESTRequest`` (HTTP method, path, query parameters, and raw body bytes) and returns a ``RESTOutcome`` that is either a single ``RESTOutcome/response(_:)`` or a ``RESTOutcome/stream(_:)`` of raw event `Data` values for SSE.
+`A2AServerREST` は A2A 仕様 §11 の HTTP+JSON REST バインディング向けトランスポート変換層。`A2AServerJSONRPC` と同様に HTTP ライブラリ非依存で設計されており、``RESTRequest``（HTTP メソッド・パス・クエリパラメータ・生ボディバイト列）を受け取り、単一レスポンスの ``RESTOutcome/response(_:)`` か SSE 用生イベント `Data` 値のストリーム ``RESTOutcome/stream(_:)`` を返す。
 
-Create a ``RESTHandler`` with any `RequestHandler` from `A2AServer`. The handler matches paths such as `POST /message:send`, `GET /tasks/{id}`, `POST /tasks/{id}:cancel`, and `GET /extendedAgentCard`, delegates to the corresponding `RequestHandler` method, then encodes the result back to JSON bytes:
+`A2AServer` の任意の `RequestHandler` を使って ``RESTHandler`` を生成する。ハンドラは `POST /message:send`・`GET /tasks/{id}`・`POST /tasks/{id}:cancel`・`GET /extendedAgentCard` などのパスをマッチさせ、対応する `RequestHandler` メソッドに委譲して結果を JSON バイト列にエンコードして返す:
 
 ```swift
 import A2ACore
@@ -16,7 +16,7 @@ import A2AServerREST
 let handler = DefaultRequestHandler(agentCard: card, executor: myExecutor)
 let restHandler = RESTHandler(handler: handler)
 
-// In your HTTP route handler (pseudo-code):
+// HTTP ルートハンドラ内（疑似コード）:
 let request = RESTRequest(
     method: "POST",
     path: "/message:send",
@@ -38,7 +38,7 @@ case .stream(let events):
 
 ## Topics
 
-### Dispatching
+### ディスパッチング
 
 - ``RESTHandler``
 - ``RESTRequest``

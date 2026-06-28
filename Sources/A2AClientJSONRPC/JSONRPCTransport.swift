@@ -3,7 +3,7 @@ import A2ACore
 import A2AClientCore
 import StructuredDataCore
 
-/// JSON-RPC 2.0 バインディング（仕様 §9）。単一エンドポイントへ POST し、SSE でストリーミングします。
+/// JSON-RPC 2.0 バインディング（仕様 §9）。単一エンドポイントへ POST し、SSE でストリーミングする。
 public struct JSONRPCTransport: A2ATransport {
     private let http: HTTPClient
     private let endpoint: URL

@@ -1,12 +1,12 @@
 # ``A2AServer``
 
-Transport-independent server framework for the A2A protocol — implement `AgentExecutor`, wire it to `DefaultRequestHandler`, and expose it through any transport binding.
+A2A プロトコルのトランスポート非依存サーバフレームワーク — `AgentExecutor` を実装し `DefaultRequestHandler` へ渡すだけで、任意のトランスポートバインディングから公開できる。
 
 ## Overview
 
-`A2AServer` provides everything you need to host an A2A-compliant agent without coupling your business logic to a particular HTTP library. Your agent logic goes into a type that conforms to ``AgentExecutor``. The framework takes care of task lifecycle, event fan-out, and push-notification delivery; you only need to publish `StreamResponse` events to the provided ``EventQueue``.
+`A2AServer` は、ビジネスロジックを特定の HTTP ライブラリに結合せずに A2A 準拠エージェントをホストするために必要なものをすべて提供する。エージェントロジックは ``AgentExecutor`` に準拠した型に記述する。タスクライフサイクル・イベントファンアウト・プッシュ通知配信はフレームワークが処理するため、実装者は `StreamResponse` イベントを提供された ``EventQueue`` へ publish するだけでよい。
 
-To wire an executor into a server, create a ``DefaultRequestHandler`` with the executor and appropriate store implementations. You then pass the handler to a transport-layer dispatcher such as `RESTHandler` (from `A2AServerREST`) or `JSONRPCHandler` (from `A2AServerJSONRPC`), or connect directly to a test client via `A2AClient.inProcess(handler:)` from `A2AInProcess`.
+エグゼキュータをサーバへ組み込むには、エグゼキュータと適切なストア実装を持つ ``DefaultRequestHandler`` を生成する。そのハンドラを `A2AServerREST` の `RESTHandler`、`A2AServerJSONRPC` の `JSONRPCHandler` といったトランスポート層ディスパッチャへ渡すか、`A2AInProcess` の `A2AClient.inProcess(handler:)` でテストクライアントへ直結する。
 
 ```swift
 import A2ACore
@@ -33,7 +33,7 @@ struct EchoExecutor: AgentExecutor {
 
 let card = AgentCard(
     name: "Echo Agent",
-    description: "Echoes input back as a reply.",
+    description: "入力をそのまま返すエージェント。",
     supportedInterfaces: [AgentInterface(url: "https://example.com/rpc", protocolBinding: "JSONRPC")],
     version: "1.0",
     capabilities: AgentCapabilities()
@@ -41,23 +41,23 @@ let card = AgentCard(
 let handler = DefaultRequestHandler(agentCard: card, executor: EchoExecutor())
 ```
 
-`A2AServer` ships in-memory implementations for quick prototyping: ``InMemoryTaskStore``, ``InMemoryQueueManager``, and ``InMemoryPushNotificationConfigStore``. For production use, conform to ``TaskStore``, ``QueueManager``, and ``PushNotificationConfigStore`` and supply your own persistence-backed implementations.
+`A2AServer` はプロトタイピング向けのインメモリ実装を同梱する: ``InMemoryTaskStore``・``InMemoryQueueManager``・``InMemoryPushNotificationConfigStore``。本番環境では ``TaskStore``・``QueueManager``・``PushNotificationConfigStore`` に準拠した独自の永続化実装を用意する。
 
 ## Topics
 
-### Agent Execution
+### エージェント実行
 
 - ``AgentExecutor``
 - ``RequestContext``
 
-### Request Handling
+### リクエスト処理
 
 - ``RequestHandler``
 - ``DefaultRequestHandler``
 - ``ServerCallContext``
 - ``ServerUser``
 
-### Task Management
+### タスク管理
 
 - ``TaskManager``
 - ``TaskStore``
@@ -66,13 +66,13 @@ let handler = DefaultRequestHandler(agentCard: card, executor: EchoExecutor())
 - ``ResultAggregator``
 - ``OwnerResolver``
 
-### Event Streaming
+### イベントストリーミング
 
 - ``EventQueue``
 - ``QueueManager``
 - ``InMemoryQueueManager``
 
-### Push Notifications
+### プッシュ通知
 
 - ``PushNotificationConfigStore``
 - ``InMemoryPushNotificationConfigStore``
@@ -80,6 +80,6 @@ let handler = DefaultRequestHandler(agentCard: card, executor: EchoExecutor())
 - ``HTTPPushNotificationSender``
 - ``InProcessPushNotificationSender``
 
-### Errors
+### エラー
 
 - ``A2AServerError``

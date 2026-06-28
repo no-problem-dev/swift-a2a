@@ -1,38 +1,38 @@
-[English](README_EN.md) | 日本語
+English | [日本語](./README.ja.md)
 
 # swift-a2a
 
-[A2A (Agent2Agent) プロトコル](https://a2a-protocol.org/latest/) **v1.0** の Swift 実装（クライアント + サーバー + in-process）。
+A Swift implementation of the [A2A (Agent2Agent) protocol](https://a2a-protocol.org/latest/) **v1.0** (client + server + in-process).
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![A2A](https://img.shields.io/badge/A2A-v1.0.1-green.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-iOS%2017+%20%7C%20macOS%2014+%20%7C%20tvOS%2017+%20%7C%20watchOS%2010+%20%7C%20visionOS%201+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-## 特徴
+## Features
 
-- **A2A v1.0 完全準拠** — 正規 Protocol Buffer 定義に基づく ProtoJSON シリアライズ（`ROLE_USER` 形式の enum、camelCase、判別子レス oneof）
-- **2 バインディング** — **REST（HTTP+JSON）** と **JSON-RPC 2.0** を提供。両者は機能的に等価（仕様 §5.1）で、エージェントが対応する方を選べる
-- **層をターゲットで分離** — 規定プロトコルの型だけ使う `A2ACore`、実装を使う `A2AClientREST` / `A2AClientJSONRPC`。アンブレラなし、依存は使う層だけが背負う
-- **SSE ストリーミング** — `message:stream` / `tasks:subscribe` をリアルタイム受信
-- **型安全 & Swift らしい設計** — oneof を enum、型付き ID、`@resultBuilder` でメッセージ構築
-- **依存最小** — Foundation + [swift-structured-data](https://github.com/no-problem-dev/swift-structured-data) のみ。gRPC・swift-syntax・マクロ非依存
+- **Full A2A v1.0 conformance** — ProtoJSON serialization derived from the canonical Protocol Buffer definitions (`ROLE_USER`-style enums, camelCase fields, discriminator-less oneofs)
+- **Two bindings** — **REST (HTTP+JSON)** and **JSON-RPC 2.0**, functionally equivalent (spec §5.1); pick whichever an agent supports
+- **Layered by target** — use just the wire types via `A2ACore`, or the client via `A2AClientREST` / `A2AClientJSONRPC`. No umbrella; each layer carries only its own dependencies
+- **SSE streaming** — real-time `message:stream` / `tasks:subscribe`
+- **Type-safe, idiomatic Swift** — oneofs as enums, typed IDs, `@resultBuilder` message construction
+- **Minimal dependencies** — Foundation + [swift-structured-data](https://github.com/no-problem-dev/swift-structured-data) only. No gRPC, no swift-syntax, no macros
 
-## アーキテクチャ
+## Architecture
 
-| Product | 役割 | 依存 |
+| Product | Role | Depends on |
 |---|---|---|
-| `A2ACore` | 規定プロトコル層: 全ワイヤ型 + ProtoJSON Codable + 構築ビルダー | StructuredDataCore |
-| `A2AClientREST` | REST（HTTP+JSON）バインディングのクライアント | A2ACore |
-| `A2AClientJSONRPC` | JSON-RPC 2.0 バインディングのクライアント | A2ACore |
-| `A2AServer` | サーバ実装フレームワーク: `AgentExecutor` / `RequestHandler` / `TaskStore` / `TaskUpdater` / `EventQueue` など（トランスポート非依存） | A2ACore |
-| `A2AServerJSONRPC` | JSON-RPC バインディングのサーバ側ディスパッチャ（HTTP 非依存） | A2AServer |
-| `A2AServerREST` | REST バインディングのサーバ側ディスパッチャ（HTTP 非依存） | A2AServer |
-| `A2AInProcess` | 同一プロセス内で client(`A2ATransport`) ↔ server(`RequestHandler`) を型直結（HTTP/シリアライズ無し） | A2AClientCore + A2AServer |
+| `A2ACore` | Protocol layer: all wire types + ProtoJSON Codable + builders | StructuredDataCore |
+| `A2AClientREST` | REST (HTTP+JSON) binding client | A2ACore |
+| `A2AClientJSONRPC` | JSON-RPC 2.0 binding client | A2ACore |
+| `A2AServer` | Server framework: `AgentExecutor` / `RequestHandler` / `TaskStore` / `TaskUpdater` / `EventQueue`, etc. (transport-agnostic) | A2ACore |
+| `A2AServerJSONRPC` | JSON-RPC binding server-side dispatcher (HTTP-agnostic) | A2AServer |
+| `A2AServerREST` | REST binding server-side dispatcher (HTTP-agnostic) | A2AServer |
+| `A2AInProcess` | In-process client(`A2ATransport`) ↔ server(`RequestHandler`) wiring with direct Swift types (no HTTP/serialization) | A2AClientCore + A2AServer |
 
-クライアントだけ欲しいときは使うバインディングの product を import します（両方入れて Agent Card から選択することも可能）。サーバを実装するときは `A2AServer` に `AgentExecutor` を実装し、`DefaultRequestHandler` に渡します。HTTP を介さず同一プロセスで動かすなら `A2AInProcess` の `A2AClient.inProcess(handler:)` を使います（リモートに切り替えたくなったら transport を差し替えるだけ）。
+Import the binding product you need for the client (or both, to negotiate via the Agent Card). To implement a server, conform to `AgentExecutor` in `A2AServer` and pass it to `DefaultRequestHandler`. To run it in the same process without HTTP, use `A2AInProcess`'s `A2AClient.inProcess(handler:)` (swap the transport for REST/JSON-RPC later if you go remote).
 
-## インストール
+## Installation
 
 ```swift
 // Package.swift
@@ -43,33 +43,33 @@ dependencies: [
 
 ```swift
 .target(name: "YourTarget", dependencies: [
-    .product(name: "A2AClientREST", package: "swift-a2a"),      // REST を使う場合
-    // .product(name: "A2AClientJSONRPC", package: "swift-a2a"), // JSON-RPC を使う場合
+    .product(name: "A2AClientREST", package: "swift-a2a"),      // for REST
+    // .product(name: "A2AClientJSONRPC", package: "swift-a2a"), // for JSON-RPC
 ])
 ```
 
-## クイックスタート
+## Quick start
 
-### クライアント生成
+### Create a client
 
 ```swift
 import A2ACore
-import A2AClientREST   // または A2AClientJSONRPC
+import A2AClientREST   // or A2AClientJSONRPC
 
-// REST バインディング
+// REST binding
 let client = A2AClient.rest(
     baseURL: URL(string: "https://agent.example.com/a2a/v1")!,
     authentication: .bearer("your-token")
 )
 
-// JSON-RPC バインディング
+// JSON-RPC binding
 // let client = A2AClient.jsonRPC(
 //     endpoint: URL(string: "https://agent.example.com/rpc")!,
 //     authentication: .bearer("your-token")
 // )
 ```
 
-### Agent Card の取得
+### Fetch the Agent Card
 
 ```swift
 let card = try await client.fetchAgentCard()   // /.well-known/agent-card.json
@@ -78,35 +78,35 @@ print(card.capabilities.streaming ?? false)
 print(card.supportedInterfaces.map(\.protocolBinding))   // ["JSONRPC", "GRPC", "HTTP+JSON"]
 ```
 
-### メッセージ送信
+### Send a message
 
 ```swift
-let response = try await client.sendMessage(.user("売上レポートを作成して"))
+let response = try await client.sendMessage(.user("Create a sales report"))
 
 switch response {
 case .task(let task):
-    print(task.status.state)        // .completed など
+    print(task.status.state)        // .completed etc.
     print(task.artifacts.first?.parts.first?.text ?? "")
 case .message(let message):
     print(message.text)
 }
 ```
 
-ビルダーで複数パートのメッセージも組み立てられます（文字列リテラルは自動でテキストパート）:
+Build multi-part messages with the result builder (string literals become text parts automatically):
 
 ```swift
 let message = Message(role: .user) {
-    "この画像を解析して"
+    "Analyze this image"
     Part.file(uri: "https://example.com/photo.png", mediaType: "image/png")
     Part.data(["threshold": 0.8])
 }
 let response = try await client.sendMessage(message)
 ```
 
-### ストリーミング
+### Streaming
 
 ```swift
-for try await event in try await client.streamMessage(.user("詳細なレポートを書いて")) {
+for try await event in try await client.streamMessage(.user("Write a detailed report")) {
     switch event {
     case .task(let task): print("task: \(task.status.state)")
     case .statusUpdate(let update): print("status: \(update.status.state)")
@@ -116,7 +116,7 @@ for try await event in try await client.streamMessage(.user("詳細なレポー�
 }
 ```
 
-### タスク操作
+### Task operations
 
 ```swift
 let task = try await client.getTask("task-id", historyLength: 10)
@@ -125,7 +125,7 @@ let list = try await client.listTasks(ListTasksRequest(status: .working))
 for try await event in try await client.subscribeToTask("task-id") { /* ... */ }
 ```
 
-### プッシュ通知設定
+### Push notification config
 
 ```swift
 let config = try await client.createPushNotificationConfig(
@@ -135,32 +135,32 @@ let configs = try await client.listPushNotificationConfigs(taskId: "task-id")
 try await client.deletePushNotificationConfig(taskId: "task-id", id: config.id ?? "")
 ```
 
-## エラーハンドリング
+## Error handling
 
 ```swift
 do {
     _ = try await client.getTask("missing")
 } catch let A2AError.rpc(error) {
-    print(error.code)     // -32001
-    print(error.reason)   // "TASK_NOT_FOUND"（google.rpc.ErrorInfo より）
+    print(error.code)              // -32001
+    print(error.reason ?? "unknown")  // TASK_NOT_FOUND (from google.rpc.ErrorInfo; reason is String?)
 } catch let A2AError.http(status, body) {
     print(status, body ?? "")
 }
 ```
 
-## 対応操作
+## Supported operations
 
-| 操作 | メソッド | JSON-RPC | REST |
+| Operation | Method | JSON-RPC | REST |
 |---|---|---|---|
-| メッセージ送信 | `sendMessage` | `SendMessage` | `POST /message:send` |
-| ストリーミング送信 | `streamMessage` | `SendStreamingMessage` | `POST /message:stream` |
-| タスク取得 | `getTask` | `GetTask` | `GET /tasks/{id}` |
-| タスク一覧 | `listTasks` | `ListTasks` | `GET /tasks` |
-| タスクキャンセル | `cancelTask` | `CancelTask` | `POST /tasks/{id}:cancel` |
-| タスク購読 | `subscribeToTask` | `SubscribeToTask` | `POST /tasks/{id}:subscribe` |
-| プッシュ設定 作成/取得/一覧/削除 | `*PushNotificationConfig` | `*TaskPushNotificationConfig` | `/tasks/{id}/pushNotificationConfigs` |
-| 拡張 Agent Card | `fetchExtendedAgentCard` | `GetExtendedAgentCard` | `GET /extendedAgentCard` |
+| Send message | `sendMessage` | `SendMessage` | `POST /message:send` |
+| Streaming send | `streamMessage` | `SendStreamingMessage` | `POST /message:stream` |
+| Get task | `getTask` | `GetTask` | `GET /tasks/{id}` |
+| List tasks | `listTasks` | `ListTasks` | `GET /tasks` |
+| Cancel task | `cancelTask` | `CancelTask` | `POST /tasks/{id}:cancel` |
+| Subscribe to task | `subscribeToTask` | `SubscribeToTask` | `POST /tasks/{id}:subscribe` |
+| Push config create/get/list/delete | `*PushNotificationConfig` | `*TaskPushNotificationConfig` | `/tasks/{id}/pushNotificationConfigs` |
+| Extended Agent Card | `fetchExtendedAgentCard` | `GetExtendedAgentCard` | `GET /extendedAgentCard` |
 
-## ライセンス
+## License
 
 MIT
