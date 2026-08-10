@@ -1,0 +1,11 @@
+version: 1
+builder:
+  configs:
+    - documentation_targets:
+        - A2AClientJSONRPC
+        - A2AClientREST
+        - A2ACore
+        - A2AInProcess
+        - A2AServer
+        - A2AServerJSONRPC
+        - A2AServerREST
