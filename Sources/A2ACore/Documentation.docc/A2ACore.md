@@ -2,9 +2,11 @@
 
 The A2A data model and its ProtoJSON encoding, shared by every other module in the package.
 
+> **Unofficial.** Not affiliated with or endorsed by the authors of the A2A protocol. Conforming to the specification is not a goal of this project.
+
 ## Overview
 
-swift-a2a implements the Agent2Agent protocol, revision 1.0.1. It is split into seven libraries so
+swift-a2a targets the Agent2Agent protocol, revision 1.0.1. It is split into seven libraries so
 you take only the layer you need, and ``A2ACore`` is what they all rest on: the task, message,
 part, artifact and agent-card types, every operation's request and response, the streaming event
 types, and the coders that write them the way the specification requires.

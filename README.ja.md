@@ -4,6 +4,8 @@
 
 [A2A (Agent2Agent) プロトコル](https://a2a-protocol.org/latest/) の Swift 実装。クライアント・サーバー・テスト用の in-process バインディングを含む。
 
+> **非公式。** A2A プロトコルの作者とは何の関係もなく、承認も受けていない。仕様に準拠することはこのプロジェクトの目標ではない。
+
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![A2A](https://img.shields.io/badge/A2A-v1.0.1-green.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-iOS%2017+%20%7C%20macOS%2014+%20%7C%20tvOS%2017+%20%7C%20watchOS%2010+%20%7C%20visionOS%201+-blue.svg)
@@ -12,7 +14,7 @@
 ## 特徴
 
 - **2 つのバインディング、1 つの API** — REST（HTTP+JSON、仕様 §11）と JSON-RPC 2.0（§9）。仕様が機能的等価を要求しているので、エージェントのカードが載せている方を選ぶだけで、他のコードは変わらない
-- **ワイヤ形式は正規の Protocol Buffer 定義から** — `ROLE_USER` 形式の enum 名、camelCase フィールド、判別子レス oneof、RFC 3339 タイムスタンプ
+- **ProtoJSON 形のワイヤ形式** — `ROLE_USER` 形式の enum 名、camelCase フィールド、判別子レス oneof、RFC 3339 タイムスタンプ。Protocol Buffer 定義から意図的に外している箇所は、その型自身のドキュメントに書いてある
 - **サーバーは 1 つの型を書くだけ** — `AgentExecutor` に適合させて `DefaultRequestHandler` に渡し、トランスポート非依存のディスパッチャ経由で公開する
 - **ネットワーク無しでテストできる** — `A2AClient.inProcess(handler:)` がクライアントをハンドラに直結する。HTTP もシリアライズも通らない
 - **SSE ストリーミング** — `message:stream` と `tasks:subscribe`。イベント境界を取りこぼさないパーサー付き
@@ -77,7 +79,7 @@ dependencies: [
 |---|---|---|
 | 0.x | 6.2+ | iOS 17+ · macOS 14+ · tvOS 17+ · watchOS 10+ · visionOS 1+ |
 
-実装している A2A のリビジョンは 1.0.1。gRPC バインディングは未実装。
+対象としている A2A のリビジョンは 1.0.1。gRPC バインディングは未実装。
 
 ## ライセンス
 

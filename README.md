@@ -4,6 +4,8 @@ English | [日本語](./README.ja.md)
 
 A Swift implementation of the [A2A (Agent2Agent) protocol](https://a2a-protocol.org/latest/) — client, server, and an in-process binding for testing.
 
+> **Unofficial.** Not affiliated with or endorsed by the authors of the A2A protocol. Conforming to the specification is not a goal of this project.
+
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![A2A](https://img.shields.io/badge/A2A-v1.0.1-green.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-iOS%2017+%20%7C%20macOS%2014+%20%7C%20tvOS%2017+%20%7C%20watchOS%2010+%20%7C%20visionOS%201+-blue.svg)
@@ -12,7 +14,7 @@ A Swift implementation of the [A2A (Agent2Agent) protocol](https://a2a-protocol.
 ## Features
 
 - **Two bindings, one API** — REST (HTTP+JSON, spec §11) and JSON-RPC 2.0 (§9), which the spec requires to be functionally equivalent. Pick whichever an agent's card advertises; nothing else changes
-- **Wire format from the canonical Protocol Buffers** — `ROLE_USER`-style enum names, camelCase fields, discriminator-less oneofs, RFC 3339 timestamps
+- **ProtoJSON-shaped wire format** — `ROLE_USER`-style enum names, camelCase fields, discriminator-less oneofs, RFC 3339 timestamps. Where a type departs from the Protocol Buffer definition on purpose, that type's own documentation says so
 - **Write a server by writing one type** — conform to `AgentExecutor`, hand it to `DefaultRequestHandler`, serve it through a transport-agnostic dispatcher
 - **Test without a network** — `A2AClient.inProcess(handler:)` connects a client straight to a handler, no HTTP and no serialization
 - **SSE streaming** — `message:stream` and `tasks:subscribe`, with a parser that does not lose event boundaries
@@ -77,7 +79,7 @@ Then add the products you need — the client binding for talking to an agent, t
 |---|---|---|
 | 0.x | 6.2+ | iOS 17+ · macOS 14+ · tvOS 17+ · watchOS 10+ · visionOS 1+ |
 
-Implements A2A revision 1.0.1. The gRPC binding is not implemented.
+Targets A2A revision 1.0.1. The gRPC binding is not implemented.
 
 ## License
 
