@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-11
+
 ### Changed
 
 - Builds and tests on Linux. `URLSession.AsyncBytes` does not exist in FoundationNetworking, and

@@ -60,7 +60,7 @@ Add the package to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/no-problem-dev/swift-a2a.git", .upToNextMinor(from: "0.7.0"))
+    .package(url: "https://github.com/no-problem-dev/swift-a2a.git", .upToNextMinor(from: "0.8.0"))
 ]
 ```
 
