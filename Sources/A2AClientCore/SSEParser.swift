@@ -27,8 +27,8 @@ public struct SSEParser: Sendable {
     ///
     /// Cancelling iteration cancels the underlying read.
     public static func events(
-        from bytes: URLSession.AsyncBytes
-    ) -> AsyncThrowingStream<Event, Error> {
+        from body: HTTPResponseBody
+    ) -> AsyncThrowingStream<Event, any Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 var event: String?
@@ -65,12 +65,14 @@ public struct SSEParser: Sendable {
                 }
 
                 do {
-                    for try await byte in bytes {
-                        if byte == 0x0A { // \n
-                            handle(line: String(decoding: lineBytes, as: UTF8.self))
-                            lineBytes.removeAll(keepingCapacity: true)
-                        } else {
-                            lineBytes.append(byte)
+                    for try await chunk in body {
+                        for byte in chunk {
+                            if byte == 0x0A { // \n
+                                handle(line: String(decoding: lineBytes, as: UTF8.self))
+                                lineBytes.removeAll(keepingCapacity: true)
+                            } else {
+                                lineBytes.append(byte)
+                            }
                         }
                     }
                     if !lineBytes.isEmpty {

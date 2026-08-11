@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Intercepts `URLSession` so a test can answer requests without a server.
 final class MockURLProtocol: URLProtocol, @unchecked Sendable {

@@ -77,7 +77,7 @@ dependencies: [
 
 | swift-a2a | Swift | プラットフォーム |
 |---|---|---|
-| 0.x | 6.2+ | iOS 17+ · macOS 14+ · tvOS 17+ · watchOS 10+ · visionOS 1+ |
+| 0.x | 6.2+ | iOS 17+ · macOS 14+ · tvOS 17+ · watchOS 10+ · visionOS 1+ · Linux |
 
 対象としている A2A のリビジョンは 1.0.1。gRPC バインディングは未実装。
 
