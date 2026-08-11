@@ -4,7 +4,10 @@ import A2ACore
 import FoundationNetworking
 #endif
 
-/// バインディング横断の HTTP 基盤。認証・A2A ヘッダ付与・送信・SSE ストリームを提供する。
+/// The HTTP layer both remote bindings share: builds requests with the A2A headers and the
+/// configured credential, and sends them buffered or as a byte stream.
+///
+/// Each instance owns its own `URLSession`, so two clients never share a connection pool.
 public struct HTTPClient: Sendable {
     public let configuration: A2AClientConfiguration
     private let session: URLSession
@@ -16,7 +19,15 @@ public struct HTTPClient: Sendable {
         self.session = URLSession(configuration: sessionConfig)
     }
 
-    /// リクエストを構築（認証・`A2A-Version`・`A2A-Extensions` 付与）。
+    /// Builds a request carrying the protocol version, any opted-in extensions, and the credential.
+    ///
+    /// - Parameters:
+    ///   - url: Where to send it.
+    ///   - method: The HTTP method.
+    ///   - contentType: The request body's media type, if there is a body.
+    ///   - accept: What the caller will take back.
+    ///   - body: The request body.
+    ///   - streaming: Whether to apply the longer streaming timeout instead of the normal one.
     public func makeRequest(
         url: URL,
         method: String,
@@ -42,7 +53,13 @@ public struct HTTPClient: Sendable {
         return request
     }
 
-    /// リクエストを送信し、本文と HTTP 応答を返す。ステータス検証は呼び出し側が行う。
+    /// Sends a request and returns the whole body.
+    ///
+    /// The status is not checked — a 4xx or 5xx comes back as data, because the bindings need to
+    /// read the error body before deciding what to throw.
+    ///
+    /// - Throws: `A2AError.timeout` on expiry, `A2AError.transport` on any other connection
+    ///   failure, `A2AError.invalidResponse` if the response is not HTTP.
     public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         do {
             let (data, response) = try await session.data(for: request)
@@ -59,7 +76,10 @@ public struct HTTPClient: Sendable {
         }
     }
 
-    /// SSE ストリームを開始し、行バイトストリームと HTTP 応答を返す。
+    /// Starts a streaming request and returns its bytes as they arrive.
+    ///
+    /// Returns as soon as the response head is available, so the status can be checked before the
+    /// body is consumed. Same error mapping as `send(_:)`.
     public func stream(_ request: URLRequest) async throws -> (URLSession.AsyncBytes, HTTPURLResponse) {
         do {
             let (bytes, response) = try await session.bytes(for: request)

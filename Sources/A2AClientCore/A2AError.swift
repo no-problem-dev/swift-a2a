@@ -1,33 +1,39 @@
 import Foundation
 import StructuredDataCore
 
-/// A2A クライアントのエラー。
+/// Everything a client call can fail with, whichever binding produced it.
+///
+/// The distinction that matters is `rpc` versus `http`: the first means the agent answered with a
+/// structured A2A error and the code is meaningful; the second means it did not, and only the
+/// status is known.
 public enum A2AError: Error, Sendable {
-    /// バインディングが報告した A2A／JSON-RPC エラー。
+    /// The agent reported a structured error. Inspect the code and reason.
     case rpc(A2ARemoteError)
-    /// 2xx 以外の HTTP 応答（構造化エラーとして解釈できなかった場合）。
+    /// A non-2xx response whose body was not a structured A2A error.
     case http(status: Int, body: String?)
-    /// 結果が空だった。
+    /// The response carried neither a result nor an error, which the protocol does not allow.
     case emptyResult
-    /// 応答が不正・想定外。
+    /// The response was well-formed HTTP but not something this client can use.
     case invalidResponse(String)
-    /// レスポンスの復号失敗。
+    /// The response body did not match the expected shape.
     case decoding(any Error)
-    /// リクエストの符号化失敗。
+    /// The request could not be serialized. The call never left the process.
     case encoding(any Error)
-    /// タイムアウト。
+    /// The request exceeded its timeout — the streaming one for streams, the normal one otherwise.
     case timeout
-    /// トランスポート（接続）エラー。
+    /// The connection failed for any other reason.
     case transport(any Error)
 }
 
-/// リモートが返した構造化エラー（JSON-RPC error / google.rpc.Status を統一表現）。
+/// A structured error from the agent, with the JSON-RPC error object and the REST `google.rpc.Status`
+/// body reduced to one shape.
 public struct A2ARemoteError: Error, Sendable, Hashable {
-    /// エラーコード（JSON-RPC コード、または HTTP ステータス）。
+    /// The error code. A JSON-RPC code such as `-32001` when the agent supplied one; otherwise the
+    /// HTTP status, which the REST binding substitutes when the body omits a code.
     public var code: Int
-    /// 人間可読なメッセージ。
+    /// The agent's message, for people to read. Never match on this — match on `code` or `reason`.
     public var message: String
-    /// `@type` 付き詳細オブジェクト配列（ProtoJSON `Any` 表現）。
+    /// Detail objects, each tagged with `@type` in the ProtoJSON encoding of `Any`.
     public var details: [StructuredValue]
 
     public init(code: Int, message: String, details: [StructuredValue] = []) {
@@ -36,14 +42,14 @@ public struct A2ARemoteError: Error, Sendable, Hashable {
         self.details = details
     }
 
-    // 標準 JSON-RPC コード
+    // The standard JSON-RPC codes.
     public static let parseError = -32700
     public static let invalidRequest = -32600
     public static let methodNotFound = -32601
     public static let invalidParams = -32602
     public static let internalError = -32603
 
-    // A2A 固有コード（仕様 §5.4）
+    // The A2A-specific codes (spec §5.4).
     public static let taskNotFound = -32001
     public static let taskNotCancelable = -32002
     public static let pushNotificationNotSupported = -32003
@@ -54,7 +60,11 @@ public struct A2ARemoteError: Error, Sendable, Hashable {
     public static let extensionSupportRequired = -32008
     public static let versionNotSupported = -32009
 
-    /// `details` 内の `google.rpc.ErrorInfo.reason`（例 `TASK_NOT_FOUND`）。
+    /// The machine-readable reason from the error details, such as `TASK_NOT_FOUND` — the value
+    /// to branch on, since codes are reused and messages are prose.
+    ///
+    /// Returns the first `reason` found in any detail object. The detail's `@type` is not checked,
+    /// so a non-`ErrorInfo` detail that happens to carry a `reason` key will be picked up.
     public var reason: String? {
         for detail in details {
             if case .object(let object) = detail,

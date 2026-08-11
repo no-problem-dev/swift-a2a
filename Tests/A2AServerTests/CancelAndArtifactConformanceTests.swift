@@ -3,10 +3,11 @@ import Testing
 import A2ACore
 @testable import A2AServer
 
-/// tasks/cancel と artifact append/lastChunk の標準準拠テスト。
+/// Conformance for cancellation and for artifact append semantics.
 ///
-/// a2a-python `on_cancel_task`: 未知タスク→TaskNotFound、executor が CANCELED を出さなければ
-/// TaskNotCancelable。`TaskUpdater.add_artifact`: append/last_chunk をイベントに透過。
+/// Cancelling an unknown task is not-found; cancelling one whose executor declines to reach the
+/// canceled state is not-cancelable. Artifact updates carry `append` and `lastChunk` through to
+/// the event unchanged.
 @Suite("Cancel + artifact conformance (mirror of a2a-python)")
 struct CancelAndArtifactConformanceTests {
 
@@ -22,7 +23,7 @@ struct CancelAndArtifactConformanceTests {
         Message(messageId: MessageID(UUID().uuidString), role: .user, parts: [.text(text)], taskId: taskId)
     }
 
-    /// working で待機し、cancel で CANCELED を発行する executor。
+    /// An executor that waits in working and publishes canceled when asked to stop.
     private struct Hanging: AgentExecutor {
         func execute(_ c: RequestContext, eventQueue q: EventQueue) async throws {
             let u = TaskUpdater(eventQueue: q, taskId: c.taskId, contextId: c.contextId)
@@ -35,7 +36,7 @@ struct CancelAndArtifactConformanceTests {
         }
     }
 
-    /// cancel が何も発行しない（CANCELED に遷移できない）executor。
+    /// An executor whose cancel publishes nothing, so the task never reaches canceled.
     private struct UncancelableWorking: AgentExecutor {
         func execute(_ c: RequestContext, eventQueue q: EventQueue) async throws {
             let u = TaskUpdater(eventQueue: q, taskId: c.taskId, contextId: c.contextId)

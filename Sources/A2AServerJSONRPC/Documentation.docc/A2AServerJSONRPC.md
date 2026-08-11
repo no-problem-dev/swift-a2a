@@ -1,25 +1,22 @@
 # ``A2AServerJSONRPC``
 
-A2A プロトコルの JSON-RPC 2.0 サーバ側ディスパッチャ — JSON-RPC 封筒をデコードし `RequestHandler` へディスパッチして、レスポンスを生バイト列にエンコードして返す。
+Turns JSON-RPC request bytes into handler calls, and answers into response bytes.
 
 ## Overview
 
-`A2AServerJSONRPC` は HTTP サーバとトランスポート非依存の `A2AServer` フレームワークの間に位置する薄いプロトコル変換層。意図的に HTTP ライブラリ非依存で設計されており、`Data` ブロブを受け取り ``JSONRPCOutcome`` を返す。`JSONRPCOutcome` は単一の ``JSONRPCOutcome/unary(_:)`` `Data` 値か、SSE フレームごとに 1 つの ``JSONRPCOutcome/stream(_:)`` `Data` 値のストリームのいずれか。そのバイト列をレスポンスボディへ書き込む責任は HTTP フレームワーク側にある。
-
-任意の `RequestHandler` を使って ``JSONRPCHandler`` を生成し、受信リクエストごとに ``JSONRPCHandler/handle(_:context:)`` を呼び出す。ハンドラは `method` フィールド（例: `SendMessage`・`GetTask`・`SubscribeToTask`）でルーティングし、対応する `RequestHandler` メソッドへ委譲。結果を標準の `{jsonrpc: "2.0", id, result}` 封筒にラップしてエンコードしたバイト列を返す:
+`A2AServerJSONRPC` sits between an HTTP server and the transport-agnostic `A2AServer` framework. It
+takes `Data` and returns a ``JSONRPCOutcome``: either one encoded envelope, or a stream of them,
+one per event. Framing those bytes — writing a body, or wrapping each element in an SSE frame — is
+the HTTP layer's job, which is what keeps this module free of any HTTP dependency.
 
 ```swift
-import A2ACore
 import A2AServer
 import A2AServerJSONRPC
 
-// A2AServer の任意の RequestHandler と組み合わせる
-let handler = DefaultRequestHandler(agentCard: card, executor: myExecutor)
-let rpcHandler = JSONRPCHandler(handler: handler)
+let rpcHandler = JSONRPCHandler(handler: DefaultRequestHandler(agentCard: card, executor: myExecutor))
 
-// HTTP ルートハンドラ内（疑似コード）:
-let requestData: Data = httpRequest.body
-let outcome = await rpcHandler.handle(requestData)
+// Inside your HTTP route (pseudocode):
+let outcome = await rpcHandler.handle(httpRequest.body, context: contextFrom(httpRequest))
 
 switch outcome {
 case .unary(let data):
@@ -31,9 +28,24 @@ case .stream(let events):
 }
 ```
 
+### Two things the HTTP layer owns
+
+**Authentication.** ``JSONRPCHandler/handle(_:context:)`` defaults its context to an
+unauthenticated caller. Nothing in this module inspects headers, so unless you build a
+`ServerCallContext` and pass it, every request shares one storage scope and callers can read each
+other's tasks.
+
+**The status code.** Dispatching never throws — a parse failure, an unknown method, bad params and
+an error from the handler all come back as an error envelope. JSON-RPC carries the failure in the
+body, so the HTTP status is yours to choose; `200` for everything the dispatcher produces is the
+conventional answer.
+
+An error raised after a stream has already opened is yielded as an error envelope on that stream,
+which then finishes normally rather than throwing.
+
 ## Topics
 
-### ディスパッチング
+### Dispatching
 
 - ``JSONRPCHandler``
 - ``JSONRPCOutcome``

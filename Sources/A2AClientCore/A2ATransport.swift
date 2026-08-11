@@ -1,40 +1,44 @@
 import A2ACore
 
-/// A2A の抽象操作を表すトランスポート。JSON-RPC / REST / gRPC などのバインディングが実装する。
+/// The eleven A2A operations, stated once so a binding can be swapped without touching call sites.
 ///
-/// 操作とデータモデルはバインディング非依存で、各実装が具体的な HTTP マッピング・封筒・
-/// エラー表現を担う（仕様 §5.1 の機能的等価性）。
+/// The specification requires the bindings to be functionally equivalent (§5.1), which is what
+/// makes one protocol possible: each conformer owns its own wire mapping, envelope shape and error
+/// representation, and none of that surfaces here. Failures arrive as `A2AError` regardless of
+/// which binding produced them.
+///
+/// Implemented here by the REST, JSON-RPC and in-process bindings. gRPC is not implemented.
 public protocol A2ATransport: Sendable {
-    /// メッセージを送信（非ストリーミング）。
+    /// Sends a message and waits for the outcome.
     func sendMessage(_ request: SendMessageRequest) async throws -> SendMessageResponse
 
-    /// メッセージを送信し、更新を SSE ストリームで受信。
+    /// Sends a message and returns a stream of updates, ending on a terminal or interrupted state.
     func sendStreamingMessage(_ request: SendMessageRequest) async throws -> AsyncThrowingStream<StreamResponse, Error>
 
-    /// タスクの現在状態を取得。
+    /// Fetches a task as it stands.
     func getTask(_ request: GetTaskRequest) async throws -> A2ATask
 
-    /// タスク一覧を取得。
+    /// Fetches a page of tasks, newest first.
     func listTasks(_ request: ListTasksRequest) async throws -> ListTasksResponse
 
-    /// 進行中タスクをキャンセル。
+    /// Asks the agent to stop a task, returning it in its final state.
     func cancelTask(_ request: CancelTaskRequest) async throws -> A2ATask
 
-    /// 非終端タスクの更新を購読。
+    /// Follows a task that is already running. The first event is always a snapshot of the task.
     func subscribeToTask(_ request: SubscribeToTaskRequest) async throws -> AsyncThrowingStream<StreamResponse, Error>
 
-    /// プッシュ通知設定を作成。
+    /// Registers a webhook for a task's updates.
     func createTaskPushNotificationConfig(_ config: TaskPushNotificationConfig) async throws -> TaskPushNotificationConfig
 
-    /// プッシュ通知設定を取得。
+    /// Fetches one webhook configuration.
     func getTaskPushNotificationConfig(_ request: GetTaskPushNotificationConfigRequest) async throws -> TaskPushNotificationConfig
 
-    /// プッシュ通知設定を一覧。
+    /// Lists the webhook configurations on a task.
     func listTaskPushNotificationConfigs(_ request: ListTaskPushNotificationConfigsRequest) async throws -> ListTaskPushNotificationConfigsResponse
 
-    /// プッシュ通知設定を削除。
+    /// Removes a webhook configuration.
     func deleteTaskPushNotificationConfig(_ request: DeleteTaskPushNotificationConfigRequest) async throws
 
-    /// 認証済み拡張 Agent Card を取得。
+    /// Fetches the fuller card available to authenticated callers.
     func getExtendedAgentCard(_ request: GetExtendedAgentCardRequest) async throws -> AgentCard
 }

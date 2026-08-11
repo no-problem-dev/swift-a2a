@@ -3,17 +3,16 @@ import Testing
 import A2ACore
 @testable import A2AServer
 
-/// `tasks/list` の標準準拠テスト。
-///
-/// a2a-python `tests/server/tasks/test_inmemory_task_store.py::test_list_tasks` の
-/// parametrize ケースを 1:1 移植したもの（ground truth）。spec §240/§246/§254/§262。
+/// Conformance for task listing, porting the reference implementation's parametrized cases as
+/// ground truth. Covers filtering, ordering, paging and the always-present page token
+/// (spec §240, §246, §254, §262).
 @Suite("tasks/list conformance (mirror of a2a-python test_list_tasks)")
 struct TaskListConformanceTests {
 
     private static let day1 = Date(timeIntervalSince1970: 1000)
     private static let day2 = Date(timeIntervalSince1970: 2000)
 
-    /// python テストと同じ 5 タスク（task-0..4）を投入した store。
+    /// A store seeded with the same five tasks the reference test uses.
     private func makeStore() async throws -> InMemoryTaskStore {
         let store = InMemoryTaskStore()
         let specs: [(String, String, TaskState, Date?)] = [
@@ -40,31 +39,31 @@ struct TaskListConformanceTests {
     }
 
     static let cases: [Case] = [
-        // 引数なし → 全件（ソート順）
+        // No filters: everything, in sort order.
         Case(request: ListTasksRequest(),
              expectedIDs: ["task-2", "task-1", "task-0", "task-4", "task-3"], totalSize: 5, nextPageToken: ""),
-        // 未知 context
+        // An unknown context matches nothing.
         Case(request: ListTasksRequest(contextId: "nonexistent"),
              expectedIDs: [], totalSize: 0, nextPageToken: ""),
-        // ページネーション（1ページ目）
+        // Paging: the first page.
         Case(request: ListTasksRequest(pageSize: 2),
              expectedIDs: ["task-2", "task-1"], totalSize: 5, nextPageToken: "dGFzay0w"), // base64("task-0")
-        // ページネーション（同一 timestamp 跨ぎ）
+        // Paging across tasks sharing a timestamp.
         Case(request: ListTasksRequest(pageSize: 2, pageToken: "dGFzay0x"), // base64("task-1")
              expectedIDs: ["task-1", "task-0"], totalSize: 5, nextPageToken: "dGFzay00"), // base64("task-4")
-        // ページネーション（最終ページ）
+        // Paging: the last page.
         Case(request: ListTasksRequest(pageSize: 2, pageToken: "dGFzay0z"), // base64("task-3")
              expectedIDs: ["task-3"], totalSize: 5, nextPageToken: ""),
-        // context_id フィルタ
+        // Filter by context.
         Case(request: ListTasksRequest(contextId: "context-1"),
              expectedIDs: ["task-1", "task-3"], totalSize: 2, nextPageToken: ""),
-        // status フィルタ
+        // Filter by status.
         Case(request: ListTasksRequest(status: .working),
              expectedIDs: ["task-1", "task-3"], totalSize: 2, nextPageToken: ""),
-        // 複合フィルタ（context_id + status）
+        // Filter by context and status together.
         Case(request: ListTasksRequest(contextId: "context-0", status: .submitted),
              expectedIDs: ["task-2", "task-0"], totalSize: 2, nextPageToken: ""),
-        // 複合フィルタ + ページネーション
+        // Combined filters with paging.
         Case(request: ListTasksRequest(contextId: "context-0", pageSize: 1),
              expectedIDs: ["task-2"], totalSize: 3, nextPageToken: "dGFzay0w"), // base64("task-0")
     ]
@@ -77,7 +76,7 @@ struct TaskListConformanceTests {
         #expect(page.tasks.map(\.id.rawValue) == c.expectedIDs)
         #expect(page.totalSize == c.totalSize)
         #expect((page.nextPageToken ?? "") == c.nextPageToken)
-        // spec/python: response.pageSize は要求値 or 既定(50)
+        // The reported page size is the one requested, or the default when none was.
         let expectedPageSize = (c.request.pageSize ?? 0) > 0 ? c.request.pageSize! : defaultListTasksPageSize
         #expect(page.pageSize == expectedPageSize)
     }

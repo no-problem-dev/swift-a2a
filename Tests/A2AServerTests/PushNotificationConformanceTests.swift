@@ -3,17 +3,16 @@ import Testing
 import A2ACore
 @testable import A2AServer
 
-/// Push 通知の標準準拠テスト。
+/// Conformance for push notifications:
 ///
-/// a2a-python の config store / BasePushNotificationSender / インライン登録の挙動を移植:
-/// - sender は `StreamResponse` JSON を POST し、token があれば `X-A2A-Notification-Token` を付与
-/// - SendMessageConfiguration 内 config は on_message_send で store に登録される
-/// - config.id 未指定なら taskId を既定 id に採番（同 id は置換）
-/// - 配信は owner 横断（getForDispatch）
+/// - the sender POSTs the event as JSON, adding the notification-token header when one is set
+/// - a registration carried inline in a send is stored before the executor runs
+/// - a registration with no id is stored under the task id, so registering twice replaces
+/// - delivery crosses owner scopes, unlike client-facing lookups
 @Suite("Push notification conformance (mirror of a2a-python)")
 struct PushNotificationConformanceTests {
 
-    /// POST を記録する計器。
+    /// Records the POSTs the sender made.
     actor Recorder {
         struct Hit: Sendable { let url: URL; let body: Data; let headers: [String: String] }
         private(set) var hits: [Hit] = []
@@ -62,7 +61,7 @@ struct PushNotificationConformanceTests {
         let hit = try #require(hits.first)
         #expect(hit.url.absoluteString == "https://hook.example/cb")
         #expect(hit.headers["X-A2A-Notification-Token"] == "secret")
-        // payload は StreamResponse（statusUpdate エンベロープ）
+        // The payload is a stream event — here a status update.
         let decoded = try A2AJSON.makeDecoder().decode(StreamResponse.self, from: hit.body)
         guard case .statusUpdate(let u) = decoded else { Issue.record("expected statusUpdate"); return }
         #expect(u.status.state == .working)
@@ -78,7 +77,7 @@ struct PushNotificationConformanceTests {
         #expect(hit.headers["X-A2A-Notification-Token"] == nil)
     }
 
-    // MARK: - config store id 採番
+    // MARK: - Config id assignment
 
     @Test("config.id 未指定なら taskId を既定 id に採番し、同一 id 再設定で置換（重複しない）")
     func configIdAutoAssignAndReplace() async throws {
@@ -90,11 +89,11 @@ struct PushNotificationConformanceTests {
 
         _ = try await store.set(TaskPushNotificationConfig(url: "https://b/cb", taskId: taskId))
         let configs = try await store.get(taskId: taskId)
-        #expect(configs.count == 1)            // append でなく置換
+        #expect(configs.count == 1)            // Replaced, not appended.
         #expect(configs.first?.url == "https://b/cb")
     }
 
-    // MARK: - インライン登録 + end-to-end 配信
+    // MARK: - Inline registration and end-to-end delivery
 
     @Test("SendMessageConfiguration 内 config が登録され、タスク進行で webhook へ配信される")
     func inlineConfigRegisteredAndDelivered() async throws {
@@ -114,15 +113,15 @@ struct PushNotificationConformanceTests {
 
         _ = try await handler.onMessageSend(request, context: ServerCallContext())
 
-        // インライン登録: config が store に入っている（taskId 採番済み）
+        // The inline registration reached the store, with the task id filled in.
         let stored = try await store.get(taskId: taskId)
         #expect(stored.count == 1)
         #expect(stored.first?.taskId == taskId)
 
-        // 配信: タスク進行（working → artifact → completed）で webhook が叩かれた
+        // The webhook was called as the task progressed: working, artifact, completed.
         let hits = await recorder.hits
         #expect(!hits.isEmpty)
-        // 最終的に completed が配信されている
+        // A completed status was delivered in the end.
         let states: [TaskState] = hits.compactMap { hit in
             guard let r = try? A2AJSON.makeDecoder().decode(StreamResponse.self, from: hit.body) else { return nil }
             switch r {
@@ -134,9 +133,9 @@ struct PushNotificationConformanceTests {
         #expect(states.contains(.completed))
     }
 
-    // MARK: - in-process トランスポート
+    // MARK: - In-process delivery
 
-    /// in-process sink へ届いた push を記録する計器。
+    /// Records what reached the in-process sink.
     actor SinkRecorder {
         private(set) var events: [StreamResponse] = []
         func record(_ event: StreamResponse) { events.append(event) }

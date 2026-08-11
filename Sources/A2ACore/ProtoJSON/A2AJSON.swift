@@ -1,13 +1,14 @@
 import Foundation
 
-/// A2A の ProtoJSON 表現を読み書きするための正準コーダ。
+/// The coders every A2A payload must go through.
 ///
-/// A2A データモデルの JSON は通常の `JSONEncoder`/`JSONDecoder` 既定設定では
-/// タイムスタンプを正しく扱えない（既定の日付戦略は数値）。本ファクトリは
-/// 仕様 §5.6.1 の RFC 3339 文字列でタイムスタンプを符号化／復号する設定済みコーダを返す。
-/// `bytes`（Base64）は Foundation 既定の Base64 戦略でそのまま扱える。
+/// A stock `JSONCoder` writes dates as numbers, which produces JSON no A2A peer can read. These
+/// factories return coders configured for the RFC 3339 strings the specification requires. Base64
+/// for `bytes` needs no configuration — Foundation's default already matches.
+///
+/// Each call builds a fresh coder; hold on to one if you are encoding in a loop.
 public enum A2AJSON {
-    /// A2A JSON を復号する `JSONDecoder`。
+    /// A decoder that reads timestamps as RFC 3339, with or without fractional seconds.
     public static func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
@@ -24,7 +25,7 @@ public enum A2AJSON {
         return decoder
     }
 
-    /// A2A JSON を符号化する `JSONEncoder`。
+    /// An encoder that writes timestamps as RFC 3339 UTC with millisecond precision.
     public static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .custom { date, encoder in

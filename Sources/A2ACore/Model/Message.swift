@@ -1,20 +1,23 @@
-/// クライアントとエージェント間の通信単位（A2A `Message`）。
+/// One turn of the exchange between a client and an agent.
+///
+/// Setting `taskId` on an outgoing message continues that task rather than starting a new one —
+/// which is how a client answers an agent that stopped in an input-required state.
 public struct Message: Sendable, Hashable {
-    /// メッセージの一意識別子（作成者が採番）。
+    /// Identifies this message. The sender assigns it.
     public var messageId: MessageID
-    /// 送信者の役割。
+    /// Whether the client or the agent sent this.
     public var role: Role
-    /// メッセージ本体を構成するパート（1つ以上）。
+    /// The content, as one or more parts.
     public var parts: [Part]
-    /// 関連付けるコンテキスト ID。
+    /// The conversation this message belongs to. The server assigns one if it is absent.
     public var contextId: ContextID?
-    /// 関連付けるタスク ID。
+    /// The task this message continues. Absent means a new task.
     public var taskId: TaskID?
-    /// 付随メタデータ。
+    /// Free-form data carried alongside the content.
     public var metadata: A2AMetadata?
-    /// このメッセージに関与する拡張の URI 一覧。
+    /// URIs of the protocol extensions in play for this message.
     public var extensions: [String]
-    /// 追加コンテキストとして参照するタスク ID 一覧。
+    /// Other tasks the agent should consider as context for this one.
     public var referenceTaskIds: [TaskID]
 
     public init(
@@ -71,7 +74,7 @@ extension Message: Codable {
 // MARK: - Accessors
 
 extension Message {
-    /// 全テキストパートを連結した文字列。
+    /// The text parts joined with no separator; non-text parts are skipped.
     public var text: String {
         parts.compactMap(\.text).joined()
     }

@@ -2,9 +2,8 @@ import Foundation
 import Testing
 @testable import A2ACore
 
-/// `StreamResponse.parts` / `.text` の検証。
-/// a2a-python の Part 抽出ヘルパ（get_stream_response_text 等）の挙動をミラー：
-/// 4 種のペイロードそれぞれから Part を取り出し、テキストを結合する。
+/// Checks part extraction and text joining across all four event kinds, mirroring the reference
+/// implementation's stream-response helpers.
 @Suite("StreamResponse parts / text extraction")
 struct StreamResponsePartsTests {
 

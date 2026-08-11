@@ -3,11 +3,15 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// Server-Sent Events パーサー。`URLSession.AsyncBytes` を直接消費し、イベント境界（空行）を確実に検出する。
+/// Turns a byte stream into Server-Sent Events.
 ///
-/// `AsyncLineSequence` は空行を取りこぼすことがあるため、バイト列から行を組み立てて解析する。
+/// Lines are assembled from raw bytes rather than taken from `AsyncLineSequence`, which can drop
+/// the blank line that separates events — and in SSE the blank line *is* the event boundary.
+///
+/// Only events carrying at least one `data` line are emitted: comments and bare heartbeats are
+/// consumed and discarded. Unknown field names are ignored, as the format requires.
 public struct SSEParser: Sendable {
-    /// 1 件の SSE イベント。
+    /// One dispatched event.
     public struct Event: Sendable {
         public let event: String?
         public let data: String
@@ -15,7 +19,13 @@ public struct SSEParser: Sendable {
         public let retry: Int?
     }
 
-    /// バイトストリームから SSE イベントを非同期に解析する。
+    /// Parses events from a byte stream, in order.
+    ///
+    /// A trailing event with no closing blank line is still emitted when the stream ends. The
+    /// `id` and `retry` fields are parsed and handed over, but nothing here acts on them — this
+    /// parser never reconnects.
+    ///
+    /// Cancelling iteration cancels the underlying read.
     public static func events(
         from bytes: URLSession.AsyncBytes
     ) -> AsyncThrowingStream<Event, Error> {
@@ -42,7 +52,7 @@ public struct SSEParser: Sendable {
                     var line = rawLine
                     if line.hasSuffix("\r") { line.removeLast() }
                     if line.isEmpty { dispatch(); return }
-                    if line.hasPrefix(":") { return } // コメント
+                    if line.hasPrefix(":") { return } // Comment line.
 
                     let (field, value) = Self.parseField(line)
                     switch field {

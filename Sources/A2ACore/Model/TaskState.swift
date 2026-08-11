@@ -1,27 +1,31 @@
-/// タスクのライフサイクル状態（A2A `TaskState`）。
+/// Where a task is in its lifecycle, serialized as the Protocol Buffer enum name
+/// (`TASK_STATE_SUBMITTED`, …).
 ///
-/// ProtoJSON では `TASK_STATE_SUBMITTED` などとして表現される。
+/// States divide into three groups: terminal, from which a task never moves again; interrupted,
+/// where the task waits on the client and execution resumes once it responds; and the rest, which
+/// are transient.
 public enum TaskState: String, ProtoEnum {
-    /// 未指定・不定（未知値のフォールバック先）。
+    /// The absent or unrecognized value. Decoding any name this enum does not know lands here,
+    /// and encoding it omits the field entirely.
     case unspecified = "TASK_STATE_UNSPECIFIED"
-    /// 送信され受理された。
+    /// Accepted, not started.
     case submitted = "TASK_STATE_SUBMITTED"
-    /// エージェントが処理中。
+    /// Being worked on.
     case working = "TASK_STATE_WORKING"
-    /// 正常完了（終端状態）。
+    /// Finished successfully. Terminal.
     case completed = "TASK_STATE_COMPLETED"
-    /// エラーで終了（終端状態）。
+    /// Stopped by an error. Terminal.
     case failed = "TASK_STATE_FAILED"
-    /// 完了前にキャンセルされた（終端状態）。
+    /// Stopped on request before finishing. Terminal.
     case canceled = "TASK_STATE_CANCELED"
-    /// 続行にユーザー入力が必要（中断状態）。
+    /// Waiting for the client to supply more input; execution resumes when it arrives. Interrupted.
     case inputRequired = "TASK_STATE_INPUT_REQUIRED"
-    /// エージェントがタスク実行を拒否した（終端状態）。
+    /// Declined by the agent, which will not attempt the work. Terminal.
     case rejected = "TASK_STATE_REJECTED"
-    /// 続行に認証が必要（中断状態）。
+    /// Waiting for the client to authenticate before work can continue. Interrupted.
     case authRequired = "TASK_STATE_AUTH_REQUIRED"
 
-    /// 終端状態（completed / failed / canceled / rejected）かどうか。
+    /// Whether the task has stopped for good: completed, failed, canceled or rejected.
     public var isTerminal: Bool {
         switch self {
         case .completed, .failed, .canceled, .rejected: true
@@ -29,7 +33,7 @@ public enum TaskState: String, ProtoEnum {
         }
     }
 
-    /// 中断状態（inputRequired / authRequired）かどうか。
+    /// Whether the task is waiting on the client: input-required or auth-required.
     public var isInterrupted: Bool {
         switch self {
         case .inputRequired, .authRequired: true

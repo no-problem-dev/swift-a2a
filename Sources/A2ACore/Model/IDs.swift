@@ -1,6 +1,8 @@
-/// 型付き ID。生の `String` を取り違えないための薄いラッパ。
+/// A string identifier wrapped in its own type, so a task ID cannot be passed where a context ID
+/// is expected.
 ///
-/// JSON 上は素の文字列として透過的に符号化される。
+/// On the wire these are plain strings — the wrapper exists only in Swift. Any string is accepted,
+/// including the empty one, which is how a missing required ID is represented after decoding.
 public protocol A2AIdentifier: RawRepresentable, Codable, Sendable, Hashable,
     ExpressibleByStringLiteral, CustomStringConvertible
 where RawValue == String {
@@ -20,25 +22,25 @@ extension A2AIdentifier {
     public var description: String { rawValue }
 }
 
-/// タスク識別子。
+/// Identifies a task. Assigned by the server.
 public struct TaskID: A2AIdentifier {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }
 }
 
-/// コンテキスト（会話・セッション）識別子。
+/// Groups tasks and messages that belong to one ongoing conversation.
 public struct ContextID: A2AIdentifier {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }
 }
 
-/// メッセージ識別子。
+/// Identifies a message. Assigned by whoever creates it.
 public struct MessageID: A2AIdentifier {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }
 }
 
-/// アーティファクト識別子。
+/// Identifies an artifact, uniquely within its task.
 public struct ArtifactID: A2AIdentifier {
     public let rawValue: String
     public init(rawValue: String) { self.rawValue = rawValue }

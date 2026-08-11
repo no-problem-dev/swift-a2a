@@ -5,7 +5,7 @@ import A2ACore
 
 // MARK: - executors
 
-/// 説明付き working を複数回流してから完了する（push 進捗）。
+/// Publishes several working updates with messages, then completes.
 private struct ProgressExecutor: AgentExecutor {
     let steps: [String]
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
@@ -20,7 +20,7 @@ private struct ProgressExecutor: AgentExecutor {
     func cancel(_ context: RequestContext, eventQueue: EventQueue) async throws {}
 }
 
-/// 少し時間のかかるワーカー（returnImmediately / subscribe 用）。
+/// A worker slow enough to still be running when the test looks at it.
 private struct SlowExecutor: AgentExecutor {
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
@@ -56,7 +56,7 @@ private func userMessage(_ text: String, taskId: TaskID) -> Message {
 @Suite("Async task patterns (streaming / returnImmediately / subscribe / listTasks)")
 struct AsyncTaskPatternsTests {
 
-    // パターン1: ストリーミング進捗
+    // 1. Streaming progress.
     @Test("message/stream は説明付き working を順番に流す")
     func streamingProgress() async throws {
         let handler = DefaultRequestHandler(agentCard: card(), executor: ProgressExecutor(steps: ["調査開始", "資料収集", "要約"]))
@@ -74,7 +74,7 @@ struct AsyncTaskPatternsTests {
         #expect(completed)
     }
 
-    // パターン2: returnImmediately（非同期開始 → getTask で完了確認）
+    // 2. Return immediately, then confirm completion with a fetch.
     @Test("returnImmediately は即座に非終端スナップショットを返し、背景で完了する")
     func returnImmediately() async throws {
         let store = InMemoryTaskStore()
@@ -87,7 +87,7 @@ struct AsyncTaskPatternsTests {
             context: ServerCallContext()
         )
         guard case .task(let task) = response else { Issue.record("expected task"); return }
-        #expect(!task.status.state.isTerminal)   // working/submitted で即返る
+        #expect(!task.status.state.isTerminal)   // Returns while still submitted or working.
 
         var done = false
         for _ in 0..<300 {
@@ -98,14 +98,15 @@ struct AsyncTaskPatternsTests {
         #expect(done)
     }
 
-    // パターン2b: 即時完了ワーカーでも returnImmediately はタスクを返す（イベント待ちでレースしない）。
+    // 2b. Return immediately still returns a task even when the worker finishes instantly —
+    //     no race against the first event.
     @Test("returnImmediately は即時完了ワーカーでもタスクを返し、背景完了を getTask で確認できる")
     func returnImmediatelyWithInstantWorker() async throws {
         let store = InMemoryTaskStore()
         let handler = DefaultRequestHandler(agentCard: card(), executor: InstantExecutor(), taskStore: store)
         let taskId = TaskID("r-instant")
 
-        // 以前は firstSnapshot がイベントを取りこぼし「No result produced」になり得た。
+        // Regression: the first snapshot used to be able to miss events and fail with no result.
         let response = try await handler.onMessageSend(
             SendMessageRequest(message: userMessage("go", taskId: taskId),
                                configuration: SendMessageConfiguration(returnImmediately: true)),
@@ -122,7 +123,7 @@ struct AsyncTaskPatternsTests {
         #expect(done)
     }
 
-    // パターン3: subscribe（実行中タスクへ途中購読）
+    // 3. Subscribing to a run already in progress.
     @Test("subscribeToTask は実行中タスクの以降のイベントを受信し completed を見る")
     func subscribeToRunningTask() async throws {
         let handler = DefaultRequestHandler(agentCard: card(), executor: SlowExecutor())
@@ -145,7 +146,7 @@ struct AsyncTaskPatternsTests {
         #expect(sawCompleted)
     }
 
-    // パターン4: listTasks（状況照会・pull）
+    // 4. Polling with a listing.
     @Test("InMemoryTaskStore.list は status で絞り込める")
     func listTasksByStatusUnit() async throws {
         let store = InMemoryTaskStore()

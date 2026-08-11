@@ -20,7 +20,7 @@ struct RESTTransportTests {
         return A2AClient(transport: RESTTransport(http: http, baseURL: baseURL), http: http, configuration: config)
     }
 
-    /// camelCase の最小有効カード（公式 test_card_resolver.py の fixture の wire 形）。
+    /// The smallest card that decodes, in the wire form the reference fixture uses.
     static let validAgentCard = """
     {
       "name": "TestAgent",
@@ -38,7 +38,7 @@ struct RESTTransportTests {
         let captured = Box<URLRequest?>(nil)
         MockURLProtocol.handler = { request in
             captured.value = request
-            // REST は封筒なし。結果オブジェクトそのものを返す。
+            // No envelope in this binding: the body is the result itself.
             let body = #"{"task":{"id":"t","contextId":"c","status":{"state":"TASK_STATE_COMPLETED"}}}"#
             return (makeResponse(request.url!), Data(body.utf8))
         }
@@ -98,7 +98,7 @@ struct RESTTransportTests {
         }
     }
 
-    // MARK: - Agent Card resolver（公式 test_card_resolver.py の移植）
+    // MARK: - Agent card lookup (ported from the reference implementation)
 
     @Test func fetchAgentCardSuccessDefaultPath() async throws {
         let captured = Box<URLRequest?>(nil)
@@ -137,7 +137,7 @@ struct RESTTransportTests {
         }
     }
 
-    // 公式 test_proto_utils.py: test_rest_params_roundtrip の移植
+    // Ported from the reference implementation's REST parameter round-trip test.
     @Test func listTasksBuildsCamelCaseQueryParams() async throws {
         let captured = Box<URLRequest?>(nil)
         MockURLProtocol.handler = { request in
@@ -165,7 +165,7 @@ struct RESTTransportTests {
         #expect(params["pageSize"] == "10")
         #expect(params["historyLength"] == "5")
         #expect(params["includeArtifacts"] == "true")
-        // タイムスタンプは RFC 3339（往復で同一時刻に戻る）
+        // Timestamps are RFC 3339 and survive the round trip unchanged.
         #expect(params["statusTimestampAfter"].flatMap(RFC3339.date(from:)) == timestamp)
     }
 

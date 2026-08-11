@@ -1,6 +1,6 @@
 import StructuredDataCore
 
-/// JSON-RPC 2.0 リクエスト封筒。
+/// The request envelope. The id is a fresh UUID per call and is not correlated on the way back.
 struct JSONRPCRequest<Params: Encodable>: Encodable {
     let jsonrpc = "2.0"
     let id: String
@@ -10,7 +10,8 @@ struct JSONRPCRequest<Params: Encodable>: Encodable {
     enum CodingKeys: String, CodingKey { case jsonrpc, id, method, params }
 }
 
-/// JSON-RPC 2.0 レスポンス封筒。
+/// The response envelope. Exactly one of `result` and `error` is meaningful; both being absent
+/// is what surfaces as an empty result.
 struct JSONRPCResponse<Result: Decodable>: Decodable {
     let jsonrpc: String?
     let id: JSONRPCID?
@@ -18,14 +19,16 @@ struct JSONRPCResponse<Result: Decodable>: Decodable {
     let error: JSONRPCErrorObject?
 }
 
-/// JSON-RPC エラーオブジェクト（仕様 §9.5）。`data` は `@type` 付きオブジェクト配列。
+/// The error object (spec §9.5). Its `data` carries `@type`-tagged detail objects, which become
+/// the remote error's details.
 struct JSONRPCErrorObject: Decodable {
     let code: Int
     let message: String
     let data: [StructuredValue]?
 }
 
-/// JSON-RPC の id（文字列または数値）。レスポンス側の許容のため両対応で復号。
+/// A response id, which JSON-RPC allows to be either a string or a number. Decoded permissively
+/// and then ignored — this client does not match responses against requests.
 enum JSONRPCID: Decodable {
     case string(String)
     case number(Int)

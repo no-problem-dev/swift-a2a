@@ -1,9 +1,11 @@
 import A2ACore
 import Foundation
 
-/// タスクの永続化（a2a-python `TaskStore`）。
+/// Where tasks live between requests.
 ///
-/// 全メソッドは `ServerCallContext` を受け取り、owner ごとにスコープ分離する（spec §254/§13.1 MUST）。
+/// Every method takes the call context because storage is partitioned by owner: a task saved under
+/// one caller's scope must not be readable from another's (spec §254, §13.1). An implementation
+/// that ignores the context makes every task visible to everyone.
 public protocol TaskStore: Sendable {
     func save(_ task: A2ATask, context: ServerCallContext) async throws
     func get(_ id: TaskID, context: ServerCallContext) async throws -> A2ATask?
@@ -11,7 +13,8 @@ public protocol TaskStore: Sendable {
     func delete(_ id: TaskID, context: ServerCallContext) async throws
 }
 
-/// context 省略時は未認証コンテキスト（単一スコープ）として扱う利便オーバーロード。
+/// Overloads that drop the context, standing in for an unauthenticated caller — that is, the one
+/// shared scope. Convenient in tests; wrong in a deployment that serves more than one client.
 public extension TaskStore {
     func save(_ task: A2ATask) async throws { try await save(task, context: ServerCallContext()) }
     func get(_ id: TaskID) async throws -> A2ATask? { try await get(id, context: ServerCallContext()) }
@@ -19,13 +22,20 @@ public extension TaskStore {
     func delete(_ id: TaskID) async throws { try await delete(id, context: ServerCallContext()) }
 }
 
-/// `tasks/list` の既定ページサイズ（a2a-python `DEFAULT_LIST_TASKS_PAGE_SIZE`）。
+/// The page size used when a listing request does not ask for one.
 public let defaultListTasksPageSize = 50
-/// `tasks/list` の最大ページサイズ（a2a-python `MAX_LIST_TASKS_PAGE_SIZE`）。
+/// The largest page size the specification allows. Declared for implementations that enforce it;
+/// the in-memory store honours whatever size is requested.
 public let maxListTasksPageSize = 100
 
+/// Holds tasks in a dictionary, partitioned by owner. For prototyping and tests — nothing
+/// survives a restart, and nothing is shared between processes.
+///
+/// Listing sorts by status timestamp descending, placing tasks with no timestamp last and breaking
+/// ties by task ID so the order is stable across calls. Paging is by cursor: the token is the
+/// Base64 of the first task ID on the next page, and the page starts at that task inclusive. A
+/// token whose task has since been removed is rejected rather than skipped.
 public actor InMemoryTaskStore: TaskStore {
-    /// owner -> taskId -> task（a2a-python `_InMemoryTaskStoreImpl.tasks`）。
     private var tasksByOwner: [String: [TaskID: A2ATask]] = [:]
     private let ownerResolver: OwnerResolver
 
@@ -48,7 +58,7 @@ public actor InMemoryTaskStore: TaskStore {
     public func list(_ request: ListTasksRequest, context: ServerCallContext) async throws -> ListTasksResponse {
         var result = Array((tasksByOwner[ownerResolver(context)] ?? [:]).values)
 
-        // フィルタ（a2a-python InMemoryTaskStore.list と同順）。
+        // Filters combine with AND.
         if let contextId = request.contextId {
             result = result.filter { $0.contextId == contextId }
         }
@@ -56,11 +66,12 @@ public actor InMemoryTaskStore: TaskStore {
             result = result.filter { $0.status.state == status }
         }
         if let after = request.statusTimestampAfter {
-            // spec: status timestamp は境界含む（>=）。timestamp 無しは除外。
+            // The bound is inclusive, and a task with no timestamp cannot satisfy it at all.
             result = result.filter { ts in ts.status.timestamp.map { $0 >= after } ?? false }
         }
 
-        // spec §262 MUST: status timestamp DESC。安定化のため (hasTimestamp, timestamp, id) を降順比較。
+        // Newest first, as the specification requires. Comparing (has timestamp, timestamp, id)
+        // in descending order keeps the result stable when timestamps collide or are absent.
         result.sort { a, b in
             let at = a.status.timestamp, bt = b.status.timestamp
             if (at != nil) != (bt != nil) { return at != nil }
@@ -68,7 +79,7 @@ public actor InMemoryTaskStore: TaskStore {
             return a.id.rawValue > b.id.rawValue
         }
 
-        // cursor ページネーション（spec §254/§258 MUST）。
+        // Cursor paging: the token names the first task of the page, inclusive.
         let total = result.count
         var startIdx = 0
         if let token = request.pageToken, !token.isEmpty {
@@ -80,7 +91,7 @@ public actor InMemoryTaskStore: TaskStore {
         }
         let pageSize = (request.pageSize ?? 0) > 0 ? request.pageSize! : defaultListTasksPageSize
         let endIdx = startIdx + pageSize
-        // spec §246 MUST: nextPageToken は常に present、終端は空文字。
+        // Empty string on the last page — the field is always present, never absent.
         let nextPageToken = endIdx < total ? Self.encodePageToken(result[endIdx].id.rawValue) : ""
         var page = Array(result[startIdx..<min(endIdx, total)])
 
@@ -98,7 +109,11 @@ public actor InMemoryTaskStore: TaskStore {
         tasksByOwner[ownerResolver(context)]?[id] = nil
     }
 
-    // MARK: - Page token (a2a-python `encode_page_token` / `decode_page_token`: base64 of task id)
+    // MARK: - Page token
+    //
+    // Base64 of the task ID. Opaque to clients but trivially reversible, so it must not be used to
+    // carry anything a caller should not see. Decoding restores padding the encoder may have
+    // dropped, so tokens from other implementations are accepted.
 
     static func encodePageToken(_ taskId: String) -> String {
         Data(taskId.utf8).base64EncodedString()

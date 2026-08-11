@@ -1,14 +1,24 @@
 import A2ACore
 import Foundation
 
-/// `AgentExecutor` が `StreamResponse` を publish する producer 側キュー（a2a-python `EventQueue`）。
-/// `DefaultRequestHandler` が生成して `execute`/`cancel` に渡す。`tap()` 以降のイベントのみが届く。
+/// Where an executor publishes its events, and where the framework and any subscribers read them.
+///
+/// A broadcast queue with no history: `tap()` returns a stream of events enqueued *after* the tap,
+/// so a subscriber that arrives late has missed what came before. That is why a subscription is
+/// opened with a task snapshot rather than a replay.
+///
+/// Each tap buffers without bound, so a consumer that stops reading holds every subsequent event
+/// in memory until it drops the stream.
 public actor EventQueue {
     private var taps: [UUID: AsyncStream<StreamResponse>.Continuation] = [:]
     private var closed = false
 
     public init() {}
 
+    /// Publishes an event to every current tap.
+    ///
+    /// Does nothing once the queue is closed — an executor that publishes after closing loses the
+    /// event with no error.
     public func enqueue(_ event: StreamResponse) {
         guard !closed else { return }
         for continuation in taps.values {
@@ -16,6 +26,10 @@ public actor EventQueue {
         }
     }
 
+    /// Opens a stream of the events published from now on.
+    ///
+    /// Taps are independent: each sees every subsequent event. A tap taken after `close()` is
+    /// already finished and yields nothing. Dropping the stream removes the tap.
     public func tap() -> AsyncStream<StreamResponse> {
         if closed {
             return AsyncStream { $0.finish() }
@@ -29,6 +43,7 @@ public actor EventQueue {
         return stream
     }
 
+    /// Finishes every tap and refuses further events. Idempotent, and not reversible.
     public func close() {
         guard !closed else { return }
         closed = true
@@ -38,6 +53,7 @@ public actor EventQueue {
         taps.removeAll()
     }
 
+    /// Whether the queue has been closed.
     public var isClosed: Bool { closed }
 
     private func removeTap(_ id: UUID) {

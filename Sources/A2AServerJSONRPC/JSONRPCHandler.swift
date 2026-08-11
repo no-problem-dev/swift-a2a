@@ -2,15 +2,21 @@ import A2ACore
 import A2AServer
 import Foundation
 
-/// JSON-RPC リクエストの処理結果。`stream` の各要素は 1 イベント分のレスポンス封筒
-/// `{jsonrpc, id, result: <StreamResponse>}`（HTTP 層が SSE フレーミングする）。
+/// What a dispatched request produces: either one response body, or a sequence of them.
+///
+/// Both cases are already-encoded JSON. The HTTP layer writes a unary body as-is, and wraps each
+/// streamed element in an SSE frame — the framing is not done here.
 public enum JSONRPCOutcome: Sendable {
+    /// One complete response envelope.
     case unary(Data)
+    /// One envelope per event, each a full `{jsonrpc, id, result}` object.
     case stream(AsyncThrowingStream<Data, Error>)
 }
 
-/// JSON-RPC 封筒をデコードして `RequestHandler` を呼び、封筒へエンコードするディスパッチャ
-/// （a2a-python `JsonRpcDispatcher`）。HTTP 非依存（`Data` 入出力）。
+/// Decodes a JSON-RPC envelope, calls the matching handler method, and encodes the answer.
+///
+/// Bytes in, bytes out: nothing here knows about HTTP, so it drops into any server. Pair it with
+/// an HTTP layer that reads the body, builds a call context, and writes what comes back.
 public struct JSONRPCHandler: Sendable {
     private let handler: any RequestHandler
     private let encoder = A2AJSON.makeEncoder()
@@ -20,7 +26,7 @@ public struct JSONRPCHandler: Sendable {
         self.handler = handler
     }
 
-    /// JSON-RPC メソッド名（gRPC サービスメソッドと統一。仕様 §9.1）。
+    /// The method names (spec §9.1), spelled to match the gRPC service methods.
     enum Method {
         static let sendMessage = "SendMessage"
         static let sendStreamingMessage = "SendStreamingMessage"
@@ -35,6 +41,21 @@ public struct JSONRPCHandler: Sendable {
         static let extendedCard = "GetExtendedAgentCard"
     }
 
+    /// Dispatches one request.
+    ///
+    /// Never throws: every failure becomes an error envelope. A body that is not JSON yields a
+    /// parse error with a null id, a missing method yields an invalid request, an unknown method
+    /// yields method-not-found, and params that will not decode yield invalid params. Errors the
+    /// handler throws keep their A2A code if they are `A2AServerError` and become an internal
+    /// error otherwise.
+    ///
+    /// A failure that arises *after* a stream has opened is yielded as an error envelope on that
+    /// stream, which then finishes normally rather than throwing.
+    ///
+    /// - Parameters:
+    ///   - requestData: The raw request body.
+    ///   - context: Who is calling. Defaults to an unauthenticated caller — populate it in the
+    ///     HTTP layer, or every request shares one storage scope.
     public func handle(_ requestData: Data, context: ServerCallContext = ServerCallContext()) async -> JSONRPCOutcome {
         guard let meta = try? decoder.decode(JSONRPCMeta.self, from: requestData) else {
             return .unary(failure(id: .null, code: A2ARPCError.parseError, message: "Parse error"))
@@ -189,7 +210,8 @@ public struct JSONRPCHandler: Sendable {
     }
 }
 
-/// 標準 JSON-RPC エラーコード（仕様 §9.5）。
+/// The standard JSON-RPC codes for transport-level failures (spec §9.5), as distinct from the
+/// A2A-specific codes carried by `A2AServerError`.
 enum A2ARPCError {
     static let parseError = -32700
     static let invalidRequest = -32600

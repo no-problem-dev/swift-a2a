@@ -1,8 +1,11 @@
 import A2ACore
 import Foundation
 
-/// `AgentExecutor` がタスク更新を publish するヘルパ（a2a-python `TaskUpdater`）。
-/// 終端状態（completed/failed/canceled/rejected）到達後の更新はエラーになる。
+/// The convenient way for an executor to publish task updates: it fills in the identifiers, stamps
+/// each status with the current time, and refuses to publish anything after a terminal state.
+///
+/// The terminal guard is per instance, not per task. Two updaters built for the same task do not
+/// know about each other, and a second one will happily publish past a state the first finished on.
 public actor TaskUpdater {
     private let eventQueue: EventQueue
     private let taskId: TaskID
@@ -15,13 +18,16 @@ public actor TaskUpdater {
         self.contextId = contextId
     }
 
-    /// タスク状態を `state` に更新し、`EventQueue` に enqueue する。
+    /// Publishes a status update, timestamped now.
     ///
-    /// 終端状態（completed/failed/canceled/rejected）到達後に再呼び出しするとエラーになる。
+    /// The message, if given, is appended to the task's history when the update is applied — which
+    /// is how an agent asks a question alongside an input-required state.
+    ///
     /// - Parameters:
-    ///   - state: 設定する `TaskState`。
-    ///   - message: 状態に添付するメッセージ（省略可）。
-    ///   - metadata: 拡張メタデータ（省略可）。
+    ///   - state: The state to move to.
+    ///   - message: What to say about it.
+    ///   - metadata: Extension data to carry on the event.
+    /// - Throws: `A2AServerError.internalError` if this updater already published a terminal state.
     public func updateStatus(
         _ state: TaskState,
         message: Message? = nil,
@@ -38,15 +44,23 @@ public actor TaskUpdater {
         await eventQueue.enqueue(.statusUpdate(event))
     }
 
-    /// アーティファクト更新イベントを生成して `EventQueue` に enqueue する。
+    /// Publishes an artifact, or another piece of one already in flight.
+    ///
+    /// Streaming an artifact means calling this repeatedly with the same `artifactId` and
+    /// `append: true`; leaving the ID to its default mints a new one each time, which produces
+    /// separate artifacts rather than a growing one.
+    ///
+    /// Not subject to the terminal guard — publishing an artifact after a terminal state succeeds
+    /// here, though nothing is left listening for it.
+    ///
     /// - Parameters:
-    ///   - parts: アーティファクトのコンテンツパーツ。
-    ///   - artifactId: アーティファクト ID（省略時は UUID 自動生成）。
-    ///   - name: アーティファクト名（省略可）。
-    ///   - description: 説明（省略可）。
-    ///   - append: 既存アーティファクトへの追記モードにする場合 `true`。
-    ///   - lastChunk: ストリーミング最終チャンクの場合 `true`。
-    ///   - metadata: 拡張メタデータ（省略可）。
+    ///   - parts: The content.
+    ///   - artifactId: Which artifact this belongs to. A fresh UUID by default.
+    ///   - name: A name for people to read.
+    ///   - description: A description for people to read.
+    ///   - append: Whether to add to the artifact already held under this ID rather than replace it.
+    ///   - lastChunk: Whether this is the final piece. Recorded, but nothing acts on it.
+    ///   - metadata: Extension data to carry on the event.
     public func addArtifact(
         _ parts: [Part],
         artifactId: ArtifactID = ArtifactID(UUID().uuidString),
@@ -73,6 +87,8 @@ public actor TaskUpdater {
         await eventQueue.enqueue(.artifactUpdate(event))
     }
 
+    /// Builds an agent message already tied to this task and conversation, ready to attach to a
+    /// status update.
     public func makeAgentMessage(_ parts: [Part], metadata: A2AMetadata? = nil) -> Message {
         Message(
             messageId: MessageID(UUID().uuidString),
@@ -84,42 +100,44 @@ public actor TaskUpdater {
         )
     }
 
-    /// 状態を `.submitted` に更新する。`updateStatus(.submitted)` の略記。
+    /// Moves to submitted: accepted, not started.
     public func submit(message: Message? = nil) async throws {
         try await updateStatus(.submitted, message: message)
     }
 
-    /// 状態を `.working` に更新する。`updateStatus(.working)` の略記。
+    /// Moves to working.
     public func startWork(message: Message? = nil) async throws {
         try await updateStatus(.working, message: message)
     }
 
-    /// 状態を `.completed` に更新する（終端状態）。`updateStatus(.completed)` の略記。
+    /// Moves to completed. Terminal — nothing further can be published from this updater.
     public func complete(message: Message? = nil) async throws {
         try await updateStatus(.completed, message: message)
     }
 
-    /// 状態を `.failed` に更新する（終端状態）。`updateStatus(.failed)` の略記。
+    /// Moves to failed. Terminal — nothing further can be published from this updater.
     public func fail(message: Message? = nil) async throws {
         try await updateStatus(.failed, message: message)
     }
 
-    /// 状態を `.rejected` に更新する（終端状態）。`updateStatus(.rejected)` の略記。
+    /// Moves to rejected: the agent declines the work outright. Terminal.
     public func reject(message: Message? = nil) async throws {
         try await updateStatus(.rejected, message: message)
     }
 
-    /// 状態を `.canceled` に更新する（終端状態）。`updateStatus(.canceled)` の略記。
+    /// Moves to canceled. Terminal, and what a cancellation run must reach for the request to be
+    /// reported as cancelled.
     public func cancel(message: Message? = nil) async throws {
         try await updateStatus(.canceled, message: message)
     }
 
-    /// 状態を `.inputRequired` に更新する（中断状態。入力受信後に framework が再 `execute` を呼ぶ）。
+    /// Moves to input-required and ends this run. The framework calls `execute` again with the
+    /// same task when the client replies, so leave enough in the task to resume from.
     public func requiresInput(message: Message? = nil) async throws {
         try await updateStatus(.inputRequired, message: message)
     }
 
-    /// 状態を `.authRequired` に更新する（中断状態）。
+    /// Moves to auth-required and ends this run, to be resumed once the client authenticates.
     public func requiresAuth(message: Message? = nil) async throws {
         try await updateStatus(.authRequired, message: message)
     }

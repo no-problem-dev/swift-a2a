@@ -1,6 +1,8 @@
 import StructuredDataCore
 
-/// `google.protobuf.Struct` の A2A 表現。任意の JSON オブジェクトを保持するメタデータ。
+/// Free-form JSON attached to a message, task, artifact or extension — the A2A spelling of
+/// `google.protobuf.Struct`.
 ///
-/// `Message`/`Task`/`Artifact`/`AgentExtension` などの `metadata`・`params` 等で使用する。
+/// Always an object at the top level; the values inside may be anything JSON allows. A2A places no
+/// meaning on the contents, so two agents must agree out of band on what they put here.
 public typealias A2AMetadata = [String: StructuredValue]

@@ -1,8 +1,16 @@
 import A2ACore
 import Foundation
 
-/// `AgentExecutor` を子タスクで起動し、`EventQueue` の `StreamResponse` を `TaskManager` /
-/// `ResultAggregator` で集約・永続化する `RequestHandler` 既定実装（a2a-python `DefaultRequestHandler`）。
+/// Runs the executor and turns its events into persisted task state and client responses.
+///
+/// This is where the framework's guarantees are implemented: an executor is started as a child
+/// task, its events are folded through a ``TaskManager`` and saved, pushed to any registered
+/// webhooks, and — for a blocking send — consumed until the task settles. Aggregation happens here
+/// rather than in ``ResultAggregator``, which this type does not use.
+///
+/// Streaming and cancellation both require the executor's cooperation: a stream ends when the
+/// executor publishes a terminal or interrupted state, and a cancellation succeeds only if the
+/// executor's `cancel` leaves the task in the canceled state.
 public actor DefaultRequestHandler: RequestHandler {
     private let agentCard: AgentCard
     private let executor: any AgentExecutor
@@ -11,7 +19,9 @@ public actor DefaultRequestHandler: RequestHandler {
     private let pushConfigStore: (any PushNotificationConfigStore)?
     private let pushSender: (any PushNotificationSender)?
 
-    /// 実行中の producer（`execute`）Task を taskId 別に追跡し、`onCancelTask` で中断できるようにする。
+    /// Running executor tasks, so a cancellation request can interrupt the one it targets. Only
+    /// streaming and non-blocking runs are tracked; a blocking send's executor lives inside its
+    /// task group and is cancelled with the caller instead.
     private var runningProducers: [TaskID: Task<Void, Never>] = [:]
 
     public init(
@@ -32,6 +42,16 @@ public actor DefaultRequestHandler: RequestHandler {
 
     // MARK: - message/send
 
+    /// Sends a message and answers with the settled outcome.
+    ///
+    /// Blocks until the executor reaches a terminal or interrupted state, unless the request asks
+    /// to return immediately — in which case a submitted task is saved and returned while the
+    /// executor keeps running in the background, and the returned snapshot will never update.
+    ///
+    /// A webhook configuration carried in the request is registered before the executor starts, so
+    /// it catches the run's own events.
+    ///
+    /// - Throws: `A2AServerError.internalError` if the executor produced no result at all.
     public func onMessageSend(_ params: SendMessageRequest, context: ServerCallContext) async throws -> SendMessageResponse {
         let requestContext = try await buildContext(params, context)
         await registerInlinePushConfig(params, taskId: requestContext.taskId, context: context)
@@ -52,8 +72,8 @@ public actor DefaultRequestHandler: RequestHandler {
             }
             result = driven
         } else {
-            // spec §448: タスクを作成したら即座に返す（実行は背景で継続）。イベント待ちはしない。
-            // 既存タスクが無ければ submitted のタスクを生成・永続化し、getTask が即引けるようにする。
+            // Return as soon as the task exists. A new task is created and saved first, so a
+            // client that immediately fetches or subscribes finds something there.
             let initialTask = requestContext.currentTask
                 ?? A2ATask(id: requestContext.taskId, contextId: requestContext.contextId, status: TaskStatus(state: .submitted, timestamp: Date()))
             try await taskStore.save(initialTask, context: context)
@@ -66,6 +86,14 @@ public actor DefaultRequestHandler: RequestHandler {
 
     // MARK: - message/stream
 
+    /// Sends a message and returns the executor's events as they happen.
+    ///
+    /// Each event is persisted and pushed to registered webhooks before reaching the caller, so a
+    /// client that reads the stream sees nothing the store has not already recorded. The stream
+    /// ends when the executor finishes; abandoning it cancels the executor.
+    ///
+    /// - Throws: `A2AServerError.unsupportedOperation` unless the agent card advertises the
+    ///   streaming capability as explicitly `true`.
     public func onMessageSendStream(_ params: SendMessageRequest, context: ServerCallContext) async throws -> AsyncThrowingStream<StreamResponse, Error> {
         guard agentCard.capabilities.streaming == true else {
             throw A2AServerError.unsupportedOperation("Streaming is not supported by the agent")
@@ -106,6 +134,10 @@ public actor DefaultRequestHandler: RequestHandler {
 
     // MARK: - tasks/get, list, cancel
 
+    /// Fetches a task from the caller's scope, trimmed to the requested history length.
+    ///
+    /// - Returns: The task, or `nil` if the caller's scope holds no such task — which the
+    ///   transports report as not found.
     public func onGetTask(_ params: GetTaskRequest, context: ServerCallContext) async throws -> A2ATask? {
         guard var task = try await taskStore.get(params.id, context: context) else { return nil }
         if let length = params.historyLength {
@@ -114,25 +146,34 @@ public actor DefaultRequestHandler: RequestHandler {
         return task
     }
 
+    /// Lists tasks from the caller's scope. Filtering, ordering and paging are the store's.
     public func onListTasks(_ params: ListTasksRequest, context: ServerCallContext) async throws -> ListTasksResponse {
         try await taskStore.list(params, context: context)
     }
 
+    /// Stops a running task, if the executor agrees to stop it.
+    ///
+    /// The running executor is interrupted and its stream closed, then `cancel` is invoked on a
+    /// fresh queue and its events are folded in. The task is only reported as cancelled if that
+    /// leaves it in the canceled state.
+    ///
+    /// - Throws: `A2AServerError.taskNotFound` if the caller's scope holds no such task;
+    ///   `A2AServerError.taskNotCancelable` if it has already finished, or if the executor declined
+    ///   to cancel it.
     public func onCancelTask(_ params: CancelTaskRequest, context: ServerCallContext) async throws -> A2ATask? {
-        // a2a-python on_cancel_task: 未知タスクは TaskNotFound、終端は TaskNotCancelable。
         guard let task = try await taskStore.get(params.id, context: context) else {
             throw A2AServerError.taskNotFound(params.id)
         }
         if task.status.state.isTerminal {
             throw A2AServerError.taskNotCancelable(params.id)
         }
-        // 実行中の producer があれば中断し、そのストリームを閉じる。
+        // Interrupt the run in flight and close the stream that was carrying it.
         runningProducers[task.id]?.cancel()
         runningProducers[task.id] = nil
         await queueManager.close(task.id)
 
-        // executor.cancel を専用キューで実行し、その出力イベントから結果を集約する
-        // （a2a-python: キャンセルは executor 主導。最終状態が CANCELED でなければ不可）。
+        // Run `cancel` on a queue of its own and fold whatever it publishes; the final state is
+        // what decides whether the cancellation is reported as successful.
         let cancelContext = RequestContext(
             message: nil,
             taskId: task.id,
@@ -164,8 +205,18 @@ public actor DefaultRequestHandler: RequestHandler {
 
     // MARK: - tasks:subscribe
 
+    /// Follows a task that is already running.
+    ///
+    /// The first event is always a snapshot of the task as stored, so nothing is missed between
+    /// the lookup and the subscription — events published before the tap are not replayed.
+    ///
+    /// A task with no live queue — because its run finished, or because it was started in another
+    /// process — yields that snapshot and then fails with not-found. Events are not persisted here:
+    /// the run that produces them owns that.
+    ///
+    /// - Throws: `A2AServerError.taskNotFound` if the caller's scope holds no such task;
+    ///   `A2AServerError.unsupportedOperation` if it has already finished.
     public func onSubscribeToTask(_ params: SubscribeToTaskRequest, context: ServerCallContext) async throws -> AsyncThrowingStream<StreamResponse, Error> {
-        // a2a-python on_subscribe_to_task と同順: get → terminal → yield task → tap queue。
         guard let task = try await taskStore.get(params.id, context: context) else {
             throw A2AServerError.taskNotFound(params.id)
         }
@@ -175,7 +226,7 @@ public actor DefaultRequestHandler: RequestHandler {
         let queue = await queueManager.get(params.id)
         let stream = await queue?.tap()
         return AsyncThrowingStream { continuation in
-            // spec §311: 最初のイベントは必ず現在の Task。
+            // The snapshot goes out first, before anything the queue may deliver.
             continuation.yield(.task(task))
             guard let stream else {
                 continuation.finish(throwing: A2AServerError.taskNotFound(params.id))
@@ -193,11 +244,18 @@ public actor DefaultRequestHandler: RequestHandler {
 
     // MARK: - push notification config
 
+    /// Registers a webhook for a task's events.
+    ///
+    /// - Throws: `A2AServerError.pushNotificationNotSupported` if no config store was supplied.
     public func onCreateTaskPushNotificationConfig(_ params: TaskPushNotificationConfig, context: ServerCallContext) async throws -> TaskPushNotificationConfig {
         guard let store = pushConfigStore else { throw A2AServerError.pushNotificationNotSupported }
         return try await store.set(params, context: context)
     }
 
+    /// Fetches one of the caller's webhook registrations.
+    ///
+    /// - Throws: `A2AServerError.pushNotificationNotSupported` if no config store was supplied;
+    ///   `A2AServerError.invalidParams` if the task has no registration with that id.
     public func onGetTaskPushNotificationConfig(_ params: GetTaskPushNotificationConfigRequest, context: ServerCallContext) async throws -> TaskPushNotificationConfig {
         guard let store = pushConfigStore else { throw A2AServerError.pushNotificationNotSupported }
         let configs = try await store.get(taskId: params.taskId, context: context)
@@ -207,12 +265,20 @@ public actor DefaultRequestHandler: RequestHandler {
         return match
     }
 
+    /// Lists the caller's webhook registrations on a task. Returned in full — the page size and
+    /// token in the request are ignored.
+    ///
+    /// - Throws: `A2AServerError.pushNotificationNotSupported` if no config store was supplied.
     public func onListTaskPushNotificationConfigs(_ params: ListTaskPushNotificationConfigsRequest, context: ServerCallContext) async throws -> ListTaskPushNotificationConfigsResponse {
         guard let store = pushConfigStore else { throw A2AServerError.pushNotificationNotSupported }
         let configs = try await store.get(taskId: params.taskId, context: context)
         return ListTaskPushNotificationConfigsResponse(configs: configs)
     }
 
+    /// Removes one of the caller's webhook registrations. Removing one that does not exist
+    /// succeeds.
+    ///
+    /// - Throws: `A2AServerError.pushNotificationNotSupported` if no config store was supplied.
     public func onDeleteTaskPushNotificationConfig(_ params: DeleteTaskPushNotificationConfigRequest, context: ServerCallContext) async throws {
         guard let store = pushConfigStore else { throw A2AServerError.pushNotificationNotSupported }
         try await store.delete(taskId: params.taskId, configId: params.id, context: context)
@@ -220,6 +286,11 @@ public actor DefaultRequestHandler: RequestHandler {
 
     // MARK: - extended agent card
 
+    /// Returns the extended card, which here is the same card the handler was built with — no
+    /// separate authenticated card is held.
+    ///
+    /// - Throws: `A2AServerError.extendedAgentCardNotConfigured` unless the card advertises the
+    ///   capability as explicitly `true`.
     public func onGetExtendedAgentCard(_ params: GetExtendedAgentCardRequest, context: ServerCallContext) async throws -> AgentCard {
         guard agentCard.capabilities.extendedAgentCard == true else {
             throw A2AServerError.extendedAgentCardNotConfigured
@@ -254,14 +325,15 @@ public actor DefaultRequestHandler: RequestHandler {
         )
     }
 
-    /// 権威ある集約: producer を起動し、終端/中断までイベントを消費・永続化・push する。
+    /// Starts the executor and consumes its events until the task settles, persisting and pushing
+    /// each one.
     @discardableResult
     private func drive(_ requestContext: RequestContext, queue: EventQueue, taskManager: TaskManager) async throws -> SendMessageResponse? {
         let stream = await queue.tap()
         let executor = self.executor
         var result: SendMessageResponse?
-        // 構造化: producer を子タスクとして起動する。drive（= onMessageSend）を await する
-        // 親（オーケストレータ）がキャンセルされると、この group ごと子の executor まで伝播する。
+        // The executor is a child of this group, so cancelling the caller awaiting the send
+        // propagates through the group and into the executor.
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask { await Self.runExecutor(executor, requestContext, queue) }
             for await event in stream {
@@ -281,7 +353,8 @@ public actor DefaultRequestHandler: RequestHandler {
         return result
     }
 
-    /// SendMessageConfiguration 内の push 設定を store に登録する（a2a-python on_message_send 211-216）。
+    /// Registers a webhook carried inline in the send configuration, filling in the task ID the
+    /// client could not know. Failures are swallowed: a bad webhook must not fail the send.
     private func registerInlinePushConfig(_ params: SendMessageRequest, taskId: TaskID, context: ServerCallContext) async {
         guard let store = pushConfigStore, var config = params.configuration?.taskPushNotificationConfig else { return }
         if config.taskId == nil { config.taskId = taskId }
@@ -290,7 +363,7 @@ public actor DefaultRequestHandler: RequestHandler {
 
     private func sendPushIfNeeded(_ taskId: TaskID, _ event: StreamResponse) async {
         guard let sender = pushSender, let store = pushConfigStore else { return }
-        // 配信は owner 横断（a2a-python sender は get_info_for_dispatch を使う）。
+        // Delivery crosses owner scopes: every registration on the task gets the event.
         guard let configs = try? await store.configs(forDispatch: taskId), !configs.isEmpty else { return }
         for config in configs {
             await sender.send(event, to: config)
@@ -309,7 +382,7 @@ public actor DefaultRequestHandler: RequestHandler {
         do {
             try await executor.execute(context, eventQueue: queue)
         } catch is CancellationError {
-            // キャンセルは正常終了として扱う。
+            // Cancellation is an ordinary end, not a failure — no failed status is published.
         } catch {
             let status = TaskStatus(state: .failed, message: nil, timestamp: Date())
             await queue.enqueue(.statusUpdate(TaskStatusUpdateEvent(

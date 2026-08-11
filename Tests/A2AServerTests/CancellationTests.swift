@@ -3,8 +3,8 @@ import Testing
 import A2ACore
 @testable import A2AServer
 
-/// 実行を開始（working）後、キャンセルされるまで停止しないワーカー。
-/// Task キャンセルで `Task.sleep` が `CancellationError` を投げて execute が終わる。
+/// Reaches working and then stays there until cancelled.
+/// Cancellation makes the sleep throw, which is how the executor returns.
 private struct HangingExecutor: AgentExecutor {
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
@@ -39,7 +39,7 @@ struct CancellationTests {
         let handler = DefaultRequestHandler(agentCard: makeCard(), executor: HangingExecutor(), taskStore: store)
         let taskId = TaskID("t1")
 
-        // ストリーミングでワーカーを起動（working で待機）。
+        // Start the worker through a stream; it parks in working.
         let streamTask = Task {
             var sawCanceled = false
             for try await event in try await handler.onMessageSendStream(SendMessageRequest(message: userMessage("go", taskId: taskId)), context: ServerCallContext()) {
@@ -50,7 +50,7 @@ struct CancellationTests {
             return sawCanceled
         }
 
-        // working になるまで待つ。
+        // Wait until it reaches working.
         var started = false
         for _ in 0..<200 {
             if let task = try await store.get(taskId), task.status.state == .working {
@@ -61,7 +61,7 @@ struct CancellationTests {
         }
         #expect(started)
 
-        // 実行中タスクをキャンセル → producer 中断 + canceled 発行。
+        // Cancelling a running task interrupts the executor and publishes canceled.
         let canceled = try await handler.onCancelTask(CancelTaskRequest(id: taskId), context: ServerCallContext())
         #expect(canceled?.status.state == .canceled)
 
@@ -74,7 +74,7 @@ struct CancellationTests {
     @Test("終端タスクの cancelTask は taskNotCancelable を投げる")
     func cancelTerminalTask() async throws {
         let store = InMemoryTaskStore()
-        // 即完了するワーカー
+        // A worker that finishes at once.
         struct Done: AgentExecutor {
             func execute(_ c: RequestContext, eventQueue q: EventQueue) async throws {
                 let u = TaskUpdater(eventQueue: q, taskId: c.taskId, contextId: c.contextId)

@@ -1,12 +1,14 @@
-/// タスクのステータス変化を通知するイベント（A2A `TaskStatusUpdateEvent`）。
+/// Reports that a task moved to a new state.
+///
+/// An event carrying a terminal or interrupted state ends the stream that delivered it.
 public struct TaskStatusUpdateEvent: Sendable, Hashable {
-    /// 変化したタスクの ID。
+    /// The task that moved.
     public var taskId: TaskID
-    /// タスクが属するコンテキストの ID。
+    /// The conversation the task belongs to.
     public var contextId: ContextID
-    /// 新しいステータス。
+    /// The state it moved to. Its message, if any, is appended to the task's history.
     public var status: TaskStatus
-    /// 付随メタデータ。
+    /// Free-form data carried alongside the event.
     public var metadata: A2AMetadata?
 
     public init(taskId: TaskID, contextId: ContextID, status: TaskStatus, metadata: A2AMetadata? = nil) {
@@ -37,19 +39,23 @@ extension TaskStatusUpdateEvent: Codable {
     }
 }
 
-/// アーティファクト生成・更新を通知するイベント（A2A `TaskArtifactUpdateEvent`）。
+/// Delivers an artifact, or another piece of one already in flight.
+///
+/// Never ends a stream: a task keeps running after producing output.
 public struct TaskArtifactUpdateEvent: Sendable, Hashable {
-    /// 対象タスクの ID。
+    /// The task that produced the artifact.
     public var taskId: TaskID
-    /// タスクが属するコンテキストの ID。
+    /// The conversation the task belongs to.
     public var contextId: ContextID
-    /// 生成・更新されたアーティファクト。
+    /// The artifact, whole or in part.
     public var artifact: Artifact
-    /// `true` なら同一 ID の既存アーティファクトに追記する。
+    /// Whether to append these parts to the artifact already held under this ID rather than
+    /// replace it. An unknown ID is added either way.
     public var append: Bool
-    /// `true` ならこのアーティファクトの最終チャンク。
+    /// Whether this is the last piece of this artifact. Recorded, but nothing here acts on it —
+    /// an artifact is complete when the sender stops sending.
     public var lastChunk: Bool
-    /// 付随メタデータ。
+    /// Free-form data carried alongside the event.
     public var metadata: A2AMetadata?
 
     public init(
@@ -95,11 +101,14 @@ extension TaskArtifactUpdateEvent: Codable {
     }
 }
 
-/// 非ストリーミング送信（`SendMessage`）の結果（A2A `SendMessageResponse`、oneof）。
+/// What a non-streaming send comes back with: either a task to follow, or a direct reply.
+///
+/// An agent answers with a message when the exchange needs no tracked work — no task is created
+/// and there is nothing to poll afterwards.
 public enum SendMessageResponse: Sendable, Hashable {
-    /// 作成・更新されたタスク。
+    /// A task was created or advanced.
     case task(A2ATask)
-    /// エージェントからのメッセージ。
+    /// The agent replied outright.
     case message(Message)
 }
 
@@ -133,15 +142,18 @@ extension SendMessageResponse: Codable {
     }
 }
 
-/// ストリーミング／プッシュ通知で配信されるイベント（A2A `StreamResponse`、oneof）。
+/// One event on a stream, and the payload of a push notification.
+///
+/// Events arrive in the order the agent produced them. A `message`, or a `task` or `statusUpdate`
+/// whose state is terminal or interrupted, is the last event of a stream.
 public enum StreamResponse: Sendable, Hashable {
-    /// タスクの現在状態。
+    /// A whole task snapshot. Always the first event of a subscription.
     case task(A2ATask)
-    /// エージェントからのメッセージ。
+    /// A direct reply from the agent, which ends the stream.
     case message(Message)
-    /// ステータス更新イベント。
+    /// The task changed state.
     case statusUpdate(TaskStatusUpdateEvent)
-    /// アーティファクト更新イベント。
+    /// The task produced output.
     case artifactUpdate(TaskArtifactUpdateEvent)
 }
 
@@ -182,8 +194,10 @@ extension StreamResponse: Codable {
 }
 
 extension StreamResponse {
-    /// ペイロード（task / message / statusUpdate / artifactUpdate）に含まれる全 `Part` を取り出す。
-    /// a2a-python の Part 抽出ヘルパ群に相当する横断アクセサ。
+    /// Every content part in the event, whichever kind it is.
+    ///
+    /// For a task snapshot this is the artifact parts followed by the parts of the status message,
+    /// so the two sources are not distinguishable in the result.
     public var parts: [Part] {
         switch self {
         case .task(let task):
@@ -197,7 +211,9 @@ extension StreamResponse {
         }
     }
 
-    /// ペイロードの全テキストを結合して返す（a2a-python `get_stream_response_text` 相当）。
+    /// The text of every text part, joined; non-text parts are skipped.
+    ///
+    /// - Parameter delimiter: What to place between parts. A newline by default.
     public func text(delimiter: String = "\n") -> String {
         parts.compactMap(\.text).joined(separator: delimiter)
     }

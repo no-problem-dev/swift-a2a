@@ -2,8 +2,15 @@ import A2ACore
 import A2AClientCore
 import A2AServer
 
-/// `A2ATransport`（クライアント側）を同一プロセスの `RequestHandler`（サーバ側）へ直結する transport。
-/// HTTP もシリアライズも介さず Swift の型をそのまま渡す。リモート化は transport の差し替えで済む。
+/// Connects the client protocol directly to a server handler in the same process.
+///
+/// Values are passed as Swift types, never encoded, so nothing here exercises the JSON layer —
+/// a payload that would fail to serialize will pass unnoticed. Moving to a remote agent later is a
+/// change of transport and nothing else.
+///
+/// Error mapping is deliberately narrow: `A2AServerError` becomes `A2AError.rpc` with the same
+/// code, matching what a remote binding would produce, while any other error thrown by the handler
+/// propagates unchanged rather than being wrapped.
 public struct InProcessTransport: A2ATransport {
     private let handler: any RequestHandler
     private let context: ServerCallContext
@@ -67,7 +74,7 @@ public struct InProcessTransport: A2ATransport {
         try await mapping { try await handler.onGetExtendedAgentCard(request, context: context) }
     }
 
-    // サーバ側エラーをリモート transport と同一の `A2AError.rpc` に写像する。
+    // Only server errors are translated; anything else escapes as thrown.
     private func mapping<R>(_ body: () async throws -> R) async throws -> R {
         do {
             return try await body()

@@ -12,7 +12,7 @@ private struct EchoExecutor: AgentExecutor {
     func cancel(_ context: RequestContext, eventQueue: EventQueue) async throws {}
 }
 
-/// 1 ターン目で input-required、2 ターン目で completed。
+/// Stops for input on the first run, completes on the second.
 private struct InputRequiredExecutor: AgentExecutor {
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)

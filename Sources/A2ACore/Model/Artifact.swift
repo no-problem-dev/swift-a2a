@@ -1,16 +1,19 @@
-/// タスクの出力成果物（A2A `Artifact`）。
+/// Something a task produced.
+///
+/// An artifact can arrive in pieces: a streaming agent sends the same `artifactId` repeatedly with
+/// `append` set, and the recipient concatenates the parts.
 public struct Artifact: Sendable, Hashable {
-    /// アーティファクトの一意識別子（タスク内で一意）。
+    /// Identifies this artifact within its task, and is what ties streamed chunks together.
     public var artifactId: ArtifactID
-    /// 人間可読な名前。
+    /// A name for people to read.
     public var name: String?
-    /// 人間可読な説明。
+    /// A description for people to read.
     public var description: String?
-    /// 成果物の内容（1つ以上のパート）。
+    /// The content, as one or more parts.
     public var parts: [Part]
-    /// 付随メタデータ。
+    /// Free-form data carried alongside the content.
     public var metadata: A2AMetadata?
-    /// このアーティファクトに関与する拡張の URI 一覧。
+    /// URIs of the protocol extensions in play for this artifact.
     public var extensions: [String]
 
     public init(

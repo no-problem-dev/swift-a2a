@@ -3,10 +3,9 @@ import Testing
 import A2ACore
 @testable import A2AServer
 
-/// tasks/resubscribe（SubscribeToTask）の標準準拠テスト。
-///
-/// a2a-python `on_subscribe_to_task` の契約を移植: get → terminal なら UnsupportedOperation →
-/// 最初のイベントは必ず Task（spec §311）→ queue 無しなら TaskNotFound。
+/// Conformance for subscribing to a running task: an unknown task is not-found, a finished one is
+/// unsupported, the first event is always the task snapshot (spec §311), and a task with no live
+/// queue fails after that snapshot.
 @Suite("SubscribeToTask conformance (mirror of a2a-python on_subscribe_to_task)")
 struct SubscribeConformanceTests {
 
@@ -55,7 +54,7 @@ struct SubscribeConformanceTests {
         let queues = InMemoryQueueManager()
         let taskId = TaskID("t")
         try await store.save(A2ATask(id: taskId, contextId: ContextID("c"), status: TaskStatus(state: .working)))
-        _ = await queues.createOrGet(taskId) // active queue を用意
+        _ = await queues.createOrGet(taskId) // Give the task a live queue.
         let handler = handler(store: store, queues: queues)
 
         let stream = try await handler.onSubscribeToTask(SubscribeToTaskRequest(id: taskId), context: ServerCallContext())

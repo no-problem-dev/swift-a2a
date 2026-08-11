@@ -1,9 +1,10 @@
 // MARK: - SecurityScheme
 
-/// エージェントのエンドポイントを保護するセキュリティスキーム（A2A `SecurityScheme`、oneof）。
+/// How callers authenticate to an agent.
 ///
-/// v1.0 ProtoJSON では判別子フィールドを持たず、JSON のメンバ名
-/// （`apiKeySecurityScheme` 等）で種別が表される（§8.5 のサンプルに準拠）。
+/// Like ``Part``, this carries no discriminator: the kind is the JSON member name
+/// (`apiKeySecurityScheme`, `httpAuthSecurityScheme`, …). Decoding rejects an object naming none
+/// of the five, so a scheme added in a later revision fails rather than degrading.
 public enum SecurityScheme: Sendable, Hashable {
     case apiKey(APIKeySecurityScheme)
     case httpAuth(HTTPAuthSecurityScheme)
@@ -54,9 +55,9 @@ extension SecurityScheme: Codable {
 
 // MARK: - Scheme variants
 
-/// API キー認証（`APIKeySecurityScheme`）。
+/// A shared key the caller sends on every request.
 public struct APIKeySecurityScheme: Codable, Sendable, Hashable {
-    /// API キーの配置場所。
+    /// Where the key goes.
     public enum Location: String, Sendable, Codable, Hashable {
         case query, header, cookie
     }
@@ -72,7 +73,7 @@ public struct APIKeySecurityScheme: Codable, Sendable, Hashable {
     }
 }
 
-/// HTTP 認証（`HTTPAuthSecurityScheme`）。`scheme` は IANA 登録の自由文字列（例 `Bearer`）。
+/// Standard HTTP authentication, named by its IANA-registered scheme such as `Bearer` or `Basic`.
 public struct HTTPAuthSecurityScheme: Codable, Sendable, Hashable {
     public var scheme: String
     public var bearerFormat: String?
@@ -85,7 +86,7 @@ public struct HTTPAuthSecurityScheme: Codable, Sendable, Hashable {
     }
 }
 
-/// OAuth 2.0 認証（`OAuth2SecurityScheme`）。
+/// OAuth 2.0, described by the flows the agent accepts.
 public struct OAuth2SecurityScheme: Codable, Sendable, Hashable {
     public var flows: OAuthFlows
     public var oauth2MetadataUrl: String?
@@ -98,7 +99,7 @@ public struct OAuth2SecurityScheme: Codable, Sendable, Hashable {
     }
 }
 
-/// OpenID Connect 認証（`OpenIdConnectSecurityScheme`）。
+/// OpenID Connect, described by its discovery document.
 public struct OpenIdConnectSecurityScheme: Codable, Sendable, Hashable {
     public var openIdConnectUrl: String
     public var description: String?
@@ -109,7 +110,7 @@ public struct OpenIdConnectSecurityScheme: Codable, Sendable, Hashable {
     }
 }
 
-/// 相互 TLS 認証（`MutualTlsSecurityScheme`）。
+/// Mutual TLS: the client certificate is the credential, so the scheme carries no parameters.
 public struct MutualTLSSecurityScheme: Codable, Sendable, Hashable {
     public var description: String?
 
@@ -120,10 +121,12 @@ public struct MutualTLSSecurityScheme: Codable, Sendable, Hashable {
 
 // MARK: - OAuthFlows
 
-/// 対応する OAuth 2.0 フロー群（A2A `OAuthFlows`）。
+/// The OAuth 2.0 flows an agent accepts.
 ///
-/// proto 上は oneof（同時に1フロー）だが、現実のカードが複数フローを併記する
-/// OpenAPI 慣習にも耐えられるよう、各フローを任意フィールドとして保持する。
+/// A deliberate divergence: the Protocol Buffer definition makes this a oneof, so exactly one flow
+/// at a time. Real cards follow the OpenAPI convention of listing several, so every flow is an
+/// independent optional field here. A card with two flows round-trips through this type intact,
+/// which a faithful oneof would not allow.
 public struct OAuthFlows: Codable, Sendable, Hashable {
     public var authorizationCode: AuthorizationCodeOAuthFlow?
     public var clientCredentials: ClientCredentialsOAuthFlow?
@@ -146,7 +149,7 @@ public struct OAuthFlows: Codable, Sendable, Hashable {
     }
 }
 
-/// Authorization Code フロー。
+/// The authorization code flow, optionally requiring PKCE.
 public struct AuthorizationCodeOAuthFlow: Codable, Sendable, Hashable {
     public var authorizationUrl: String
     public var tokenUrl: String
@@ -191,7 +194,7 @@ public struct AuthorizationCodeOAuthFlow: Codable, Sendable, Hashable {
     }
 }
 
-/// Client Credentials フロー。
+/// The client credentials flow, for machine-to-machine calls with no end user.
 public struct ClientCredentialsOAuthFlow: Codable, Sendable, Hashable {
     public var tokenUrl: String
     public var refreshUrl: String?
@@ -220,7 +223,7 @@ public struct ClientCredentialsOAuthFlow: Codable, Sendable, Hashable {
     }
 }
 
-/// Implicit フロー（非推奨）。
+/// The implicit flow. Discouraged by current OAuth guidance; present for cards that still use it.
 public struct ImplicitOAuthFlow: Codable, Sendable, Hashable {
     public var authorizationUrl: String?
     public var refreshUrl: String?
@@ -249,7 +252,8 @@ public struct ImplicitOAuthFlow: Codable, Sendable, Hashable {
     }
 }
 
-/// Password フロー（非推奨）。
+/// The resource owner password flow. Discouraged by current OAuth guidance; present for cards
+/// that still use it.
 public struct PasswordOAuthFlow: Codable, Sendable, Hashable {
     public var tokenUrl: String?
     public var refreshUrl: String?
@@ -278,7 +282,7 @@ public struct PasswordOAuthFlow: Codable, Sendable, Hashable {
     }
 }
 
-/// Device Code フロー（RFC 8628）。
+/// The device authorization flow of RFC 8628, for inputs too limited to host a browser.
 public struct DeviceCodeOAuthFlow: Codable, Sendable, Hashable {
     public var deviceAuthorizationUrl: String
     public var tokenUrl: String
@@ -318,9 +322,14 @@ public struct DeviceCodeOAuthFlow: Codable, Sendable, Hashable {
 
 // MARK: - SecurityRequirement
 
-/// セキュリティ要件: スキーム名 → 必要スコープ一覧。
+/// One alternative set of credentials a caller may present: scheme name to required scopes.
 ///
-/// 注: proto は `map<string, StringList>`（`{"scheme":{"list":[...]}}`）と定義するが、
-/// 仕様書 §8.5 のサンプルおよび実エコシステムは OpenAPI 慣習のフラット形
-/// （`{"scheme":["scope"]}`）を用いるため、相互運用性を優先しフラット形を採用する。
+/// Within a requirement every scheme listed must be satisfied; across the array in
+/// ``AgentCard/security``, any one requirement suffices.
+///
+/// A deliberate divergence from the Protocol Buffer definition, which types this as
+/// `map<string, StringList>` and therefore serializes as `{"scheme": {"list": ["scope"]}}`. The
+/// specification's own examples and every card observed in the wild use the flat OpenAPI shape
+/// `{"scheme": ["scope"]}`, so that is what is read and written here. A card following the proto
+/// shape literally will fail to decode.
 public typealias SecurityRequirement = [String: [String]]

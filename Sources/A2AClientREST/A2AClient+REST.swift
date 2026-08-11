@@ -3,11 +3,18 @@ import A2ACore
 import A2AClientCore
 
 extension A2AClient {
-    /// HTTP+JSON / REST バインディングの A2A クライアントを生成。
+    /// Creates a client that speaks the HTTP+JSON binding.
+    ///
+    /// Each operation is its own path and verb under the base URL. A trailing slash on the base
+    /// URL is trimmed, so both spellings behave the same. Agent-card lookup ignores this URL's
+    /// path and goes to the host's well-known location.
     ///
     /// - Parameters:
-    ///   - baseURL: 各操作パス（`/message:send` 等）を連結するベース URL。
-    ///   - authentication: 認証方式。
+    ///   - baseURL: The prefix each operation path is appended to.
+    ///   - authentication: What to send to prove who the client is.
+    ///   - timeout: Seconds to wait on a non-streaming request.
+    ///   - streamTimeout: Seconds to wait on a streaming request.
+    ///   - extensions: Extension URIs to declare on every request.
     public static func rest(
         baseURL: URL,
         authentication: A2AAuthentication = .none,

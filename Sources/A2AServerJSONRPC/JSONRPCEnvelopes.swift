@@ -1,6 +1,7 @@
 import A2ACore
 
-/// JSON-RPC 2.0 の id（文字列 / 数値 / null）。
+/// A request id: string, number or null. An id this decoder cannot read becomes null rather than
+/// failing, so a malformed id still gets an answer.
 enum JSONRPCID: Codable, Sendable, Hashable {
     case string(String)
     case number(Int)
@@ -59,5 +60,6 @@ struct JSONRPCErrorObject: Encodable {
     let message: String
 }
 
-/// void 操作の空結果（`{}`）。
+/// The result for operations that return nothing: an empty object, since JSON-RPC requires a
+/// result field on success.
 struct EmptyResult: Encodable {}

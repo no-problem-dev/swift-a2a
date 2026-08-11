@@ -1,12 +1,16 @@
 # ``A2AServer``
 
-A2A プロトコルのトランスポート非依存サーバフレームワーク — `AgentExecutor` を実装し `DefaultRequestHandler` へ渡すだけで、任意のトランスポートバインディングから公開できる。
+Host an A2A agent by writing one type: an executor. Everything else is here.
 
 ## Overview
 
-`A2AServer` は、ビジネスロジックを特定の HTTP ライブラリに結合せずに A2A 準拠エージェントをホストするために必要なものをすべて提供する。エージェントロジックは ``AgentExecutor`` に準拠した型に記述する。タスクライフサイクル・イベントファンアウト・プッシュ通知配信はフレームワークが処理するため、実装者は `StreamResponse` イベントを提供された ``EventQueue`` へ publish するだけでよい。
+`A2AServer` holds the machinery an agent needs and none of the HTTP. Write the agent's logic as an
+``AgentExecutor``, hand it to a ``DefaultRequestHandler``, and pass that handler to whichever
+transport dispatcher you serve — `RESTHandler`, `JSONRPCHandler`, or `A2AClient.inProcess(handler:)`
+in tests.
 
-エグゼキュータをサーバへ組み込むには、エグゼキュータと適切なストア実装を持つ ``DefaultRequestHandler`` を生成する。そのハンドラを `A2AServerREST` の `RESTHandler`、`A2AServerJSONRPC` の `JSONRPCHandler` といったトランスポート層ディスパッチャへ渡すか、`A2AInProcess` の `A2AClient.inProcess(handler:)` でテストクライアントへ直結する。
+The executor publishes events; the framework persists the task, fans events out to subscribers,
+delivers push notifications, and decides what a client gets back.
 
 ```swift
 import A2ACore
@@ -14,72 +18,110 @@ import A2AServer
 
 struct EchoExecutor: AgentExecutor {
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
-        let text = context.userInput()
-        let status = TaskStatus(state: .completed, message: Message.agent("Echo: \(text)"))
-        await eventQueue.enqueue(.statusUpdate(
-            TaskStatusUpdateEvent(taskId: context.taskId, contextId: context.contextId, status: status)
-        ))
-        await eventQueue.close()
+        let updater = TaskUpdater(
+            eventQueue: eventQueue,
+            taskId: context.taskId,
+            contextId: context.contextId
+        )
+        try await updater.startWork()
+        let reply = await updater.makeAgentMessage([.text("Echo: \(context.userInput())")])
+        try await updater.complete(message: reply)
     }
 
     func cancel(_ context: RequestContext, eventQueue: EventQueue) async throws {
-        let status = TaskStatus(state: .canceled)
-        await eventQueue.enqueue(.statusUpdate(
-            TaskStatusUpdateEvent(taskId: context.taskId, contextId: context.contextId, status: status)
-        ))
-        await eventQueue.close()
+        let updater = TaskUpdater(
+            eventQueue: eventQueue,
+            taskId: context.taskId,
+            contextId: context.contextId
+        )
+        try await updater.cancel()
     }
 }
 
 let card = AgentCard(
     name: "Echo Agent",
-    description: "入力をそのまま返すエージェント。",
+    description: "Returns whatever it is sent.",
     supportedInterfaces: [AgentInterface(url: "https://example.com/rpc", protocolBinding: "JSONRPC")],
     version: "1.0",
-    capabilities: AgentCapabilities()
+    capabilities: AgentCapabilities(streaming: true)
 )
 let handler = DefaultRequestHandler(agentCard: card, executor: EchoExecutor())
 ```
 
-`A2AServer` はプロトタイピング向けのインメモリ実装を同梱する: ``InMemoryTaskStore``・``InMemoryQueueManager``・``InMemoryPushNotificationConfigStore``。本番環境では ``TaskStore``・``QueueManager``・``PushNotificationConfigStore`` に準拠した独自の永続化実装を用意する。
+### What an executor must guarantee
+
+Return only after publishing a terminal state — completed, failed, canceled or rejected — or an
+interrupted one. Returning early leaves a blocking send waiting on a task that never settles.
+
+Publishing `.inputRequired` ends the run, and the framework calls `execute` again with the same task
+once the client answers. An executor must therefore be able to resume from
+``RequestContext/currentTask`` rather than assuming it starts from nothing.
+
+Throwing is a legitimate failure path: the framework publishes a failed status for you. Cancellation
+is not a failure — a cancelled run ends quietly.
+
+### Capabilities are enforced
+
+The agent card is not decoration. Streaming requests are refused unless `capabilities.streaming` is
+explicitly `true`, and the extended card is refused unless `capabilities.extendedAgentCard` is
+explicitly `true`. An absent flag counts as unsupported.
+
+### Cancellation is the executor's decision
+
+`onCancelTask` interrupts the running executor and then calls its `cancel`. The request only
+succeeds if that leaves the task in the canceled state; an executor that declines makes the
+request fail as not cancelable, which is exactly what the protocol intends.
+
+### Storage is scoped by caller
+
+Every store method takes a ``ServerCallContext`` and partitions by the owner an ``OwnerResolver``
+derives from it, so one caller cannot read another's tasks. The transport dispatchers do not
+populate that context — they default it — so authentication belongs in the HTTP layer that builds a
+context before handing bytes to a dispatcher. Leaving it at its default puts every caller in one
+shared scope, which is right only for a single-tenant agent.
+
+### The in-memory stores are for prototyping
+
+``InMemoryTaskStore``, ``InMemoryQueueManager`` and ``InMemoryPushNotificationConfigStore`` keep
+everything in process memory. Nothing survives a restart, and nothing is visible to a second
+instance — which also means a subscription can only be served by the process that started the run.
+Implement ``TaskStore``, ``QueueManager`` and ``PushNotificationConfigStore`` over shared storage
+before running more than one.
 
 ## Topics
 
-### エージェント実行
+### Writing an Agent
 
 - ``AgentExecutor``
 - ``RequestContext``
+- ``TaskUpdater``
 
-### リクエスト処理
+### Serving Requests
 
 - ``RequestHandler``
 - ``DefaultRequestHandler``
 - ``ServerCallContext``
 - ``ServerUser``
+- ``A2AServerError``
 
-### タスク管理
+### Storing Tasks
 
-- ``TaskManager``
 - ``TaskStore``
 - ``InMemoryTaskStore``
-- ``TaskUpdater``
+- ``TaskManager``
 - ``ResultAggregator``
 - ``OwnerResolver``
 
-### イベントストリーミング
+### Streaming Events
 
 - ``EventQueue``
 - ``QueueManager``
 - ``InMemoryQueueManager``
 
-### プッシュ通知
+### Push Notifications
 
 - ``PushNotificationConfigStore``
 - ``InMemoryPushNotificationConfigStore``
 - ``PushNotificationSender``
 - ``HTTPPushNotificationSender``
 - ``InProcessPushNotificationSender``
-
-### エラー
-
-- ``A2AServerError``

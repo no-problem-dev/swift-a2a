@@ -1,8 +1,8 @@
-English | [日本語](./README.ja.md)
-
 # swift-a2a
 
-A Swift implementation of the [A2A (Agent2Agent) protocol](https://a2a-protocol.org/latest/) **v1.0** (client + server + in-process).
+English | [日本語](./README.ja.md)
+
+A Swift implementation of the [A2A (Agent2Agent) protocol](https://a2a-protocol.org/latest/) — client, server, and an in-process binding for testing.
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![A2A](https://img.shields.io/badge/A2A-v1.0.1-green.svg)
@@ -11,156 +11,74 @@ A Swift implementation of the [A2A (Agent2Agent) protocol](https://a2a-protocol.
 
 ## Features
 
-- **Full A2A v1.0 conformance** — ProtoJSON serialization derived from the canonical Protocol Buffer definitions (`ROLE_USER`-style enums, camelCase fields, discriminator-less oneofs)
-- **Two bindings** — **REST (HTTP+JSON)** and **JSON-RPC 2.0**, functionally equivalent (spec §5.1); pick whichever an agent supports
-- **Layered by target** — use just the wire types via `A2ACore`, or the client via `A2AClientREST` / `A2AClientJSONRPC`. No umbrella; each layer carries only its own dependencies
-- **SSE streaming** — real-time `message:stream` / `tasks:subscribe`
-- **Type-safe, idiomatic Swift** — oneofs as enums, typed IDs, `@resultBuilder` message construction
-- **Minimal dependencies** — Foundation + [swift-structured-data](https://github.com/no-problem-dev/swift-structured-data) only. No gRPC, no swift-syntax, no macros
+- **Two bindings, one API** — REST (HTTP+JSON, spec §11) and JSON-RPC 2.0 (§9), which the spec requires to be functionally equivalent. Pick whichever an agent's card advertises; nothing else changes
+- **Wire format from the canonical Protocol Buffers** — `ROLE_USER`-style enum names, camelCase fields, discriminator-less oneofs, RFC 3339 timestamps
+- **Write a server by writing one type** — conform to `AgentExecutor`, hand it to `DefaultRequestHandler`, serve it through a transport-agnostic dispatcher
+- **Test without a network** — `A2AClient.inProcess(handler:)` connects a client straight to a handler, no HTTP and no serialization
+- **SSE streaming** — `message:stream` and `tasks:subscribe`, with a parser that does not lose event boundaries
+- **Type-safe and idiomatic** — oneofs as enums, typed identifiers, `@resultBuilder` message construction
+- **Two dependencies** — Foundation and [swift-structured-data](https://github.com/no-problem-dev/swift-structured-data). No gRPC, no swift-syntax, no macros
 
-## Architecture
-
-| Product | Role | Depends on |
-|---|---|---|
-| `A2ACore` | Protocol layer: all wire types + ProtoJSON Codable + builders | StructuredDataCore |
-| `A2AClientREST` | REST (HTTP+JSON) binding client | A2ACore |
-| `A2AClientJSONRPC` | JSON-RPC 2.0 binding client | A2ACore |
-| `A2AServer` | Server framework: `AgentExecutor` / `RequestHandler` / `TaskStore` / `TaskUpdater` / `EventQueue`, etc. (transport-agnostic) | A2ACore |
-| `A2AServerJSONRPC` | JSON-RPC binding server-side dispatcher (HTTP-agnostic) | A2AServer |
-| `A2AServerREST` | REST binding server-side dispatcher (HTTP-agnostic) | A2AServer |
-| `A2AInProcess` | In-process client(`A2ATransport`) ↔ server(`RequestHandler`) wiring with direct Swift types (no HTTP/serialization) | A2AClientCore + A2AServer |
-
-Import the binding product you need for the client (or both, to negotiate via the Agent Card). To implement a server, conform to `AgentExecutor` in `A2AServer` and pass it to `DefaultRequestHandler`. To run it in the same process without HTTP, use `A2AInProcess`'s `A2AClient.inProcess(handler:)` (swap the transport for REST/JSON-RPC later if you go remote).
-
-## Installation
+## Quick Start
 
 ```swift
-// Package.swift
-dependencies: [
-    .package(url: "https://github.com/no-problem-dev/swift-a2a.git", from: "0.3.0")
-]
-```
-
-```swift
-.target(name: "YourTarget", dependencies: [
-    .product(name: "A2AClientREST", package: "swift-a2a"),      // for REST
-    // .product(name: "A2AClientJSONRPC", package: "swift-a2a"), // for JSON-RPC
-])
-```
-
-## Quick start
-
-### Create a client
-
-```swift
-import A2ACore
 import A2AClientREST   // or A2AClientJSONRPC
 
-// REST binding
 let client = A2AClient.rest(
     baseURL: URL(string: "https://agent.example.com/a2a/v1")!,
     authentication: .bearer("your-token")
 )
 
-// JSON-RPC binding
-// let client = A2AClient.jsonRPC(
-//     endpoint: URL(string: "https://agent.example.com/rpc")!,
-//     authentication: .bearer("your-token")
-// )
-```
-
-### Fetch the Agent Card
-
-```swift
-let card = try await client.fetchAgentCard()   // /.well-known/agent-card.json
-print(card.name)
-print(card.capabilities.streaming ?? false)
-print(card.supportedInterfaces.map(\.protocolBinding))   // ["JSONRPC", "GRPC", "HTTP+JSON"]
-```
-
-### Send a message
-
-```swift
 let response = try await client.sendMessage(.user("Create a sales report"))
 
 switch response {
 case .task(let task):
-    print(task.status.state)        // .completed etc.
+    print(task.status.state)
     print(task.artifacts.first?.parts.first?.text ?? "")
 case .message(let message):
     print(message.text)
 }
 ```
 
-Build multi-part messages with the result builder (string literals become text parts automatically):
+Streaming, task operations, push notification configuration, and the server side are covered in the documentation.
+
+## Documentation
+
+Each library has its own DocC page:
+
+- [A2ACore](https://no-problem-dev.github.io/swift-a2a/documentation/a2acore/) — the data model and its encoding
+- [A2AClientREST](https://no-problem-dev.github.io/swift-a2a/documentation/a2aclientrest/) · [A2AClientJSONRPC](https://no-problem-dev.github.io/swift-a2a/documentation/a2aclientjsonrpc/) — the two client bindings
+- [A2AServer](https://no-problem-dev.github.io/swift-a2a/documentation/a2aserver/) — writing and hosting an agent
+- [A2AServerREST](https://no-problem-dev.github.io/swift-a2a/documentation/a2aserverrest/) · [A2AServerJSONRPC](https://no-problem-dev.github.io/swift-a2a/documentation/a2aserverjsonrpc/) — the server-side dispatchers
+- [A2AInProcess](https://no-problem-dev.github.io/swift-a2a/documentation/a2ainprocess/) — testing without a network
+
+## Installation
+
+Add the package to your `Package.swift`:
 
 ```swift
-let message = Message(role: .user) {
-    "Analyze this image"
-    Part.file(uri: "https://example.com/photo.png", mediaType: "image/png")
-    Part.data(["threshold": 0.8])
-}
-let response = try await client.sendMessage(message)
+dependencies: [
+    .package(url: "https://github.com/no-problem-dev/swift-a2a.git", from: "0.3.0")
+]
 ```
 
-### Streaming
+Then add the products you need — the client binding for talking to an agent, the server ones for hosting:
 
 ```swift
-for try await event in try await client.streamMessage(.user("Write a detailed report")) {
-    switch event {
-    case .task(let task): print("task: \(task.status.state)")
-    case .statusUpdate(let update): print("status: \(update.status.state)")
-    case .artifactUpdate(let update): print("artifact chunk: \(update.artifact.parts.first?.text ?? "")")
-    case .message(let message): print("message: \(message.text)")
-    }
-}
+.target(name: "YourTarget", dependencies: [
+    .product(name: "A2AClientREST", package: "swift-a2a"),
+    // .product(name: "A2AClientJSONRPC", package: "swift-a2a"),
+])
 ```
 
-### Task operations
+## Requirements
 
-```swift
-let task = try await client.getTask("task-id", historyLength: 10)
-let canceled = try await client.cancelTask("task-id")
-let list = try await client.listTasks(ListTasksRequest(status: .working))
-for try await event in try await client.subscribeToTask("task-id") { /* ... */ }
-```
+| swift-a2a | Swift | Platforms |
+|---|---|---|
+| 0.x | 6.2+ | iOS 17+ · macOS 14+ · tvOS 17+ · watchOS 10+ · visionOS 1+ |
 
-### Push notification config
-
-```swift
-let config = try await client.createPushNotificationConfig(
-    TaskPushNotificationConfig(url: "https://my-webhook.example.com/a2a", taskId: "task-id")
-)
-let configs = try await client.listPushNotificationConfigs(taskId: "task-id")
-try await client.deletePushNotificationConfig(taskId: "task-id", id: config.id ?? "")
-```
-
-## Error handling
-
-```swift
-do {
-    _ = try await client.getTask("missing")
-} catch let A2AError.rpc(error) {
-    print(error.code)              // -32001
-    print(error.reason ?? "unknown")  // TASK_NOT_FOUND (from google.rpc.ErrorInfo; reason is String?)
-} catch let A2AError.http(status, body) {
-    print(status, body ?? "")
-}
-```
-
-## Supported operations
-
-| Operation | Method | JSON-RPC | REST |
-|---|---|---|---|
-| Send message | `sendMessage` | `SendMessage` | `POST /message:send` |
-| Streaming send | `streamMessage` | `SendStreamingMessage` | `POST /message:stream` |
-| Get task | `getTask` | `GetTask` | `GET /tasks/{id}` |
-| List tasks | `listTasks` | `ListTasks` | `GET /tasks` |
-| Cancel task | `cancelTask` | `CancelTask` | `POST /tasks/{id}:cancel` |
-| Subscribe to task | `subscribeToTask` | `SubscribeToTask` | `POST /tasks/{id}:subscribe` |
-| Push config create/get/list/delete | `*PushNotificationConfig` | `*TaskPushNotificationConfig` | `/tasks/{id}/pushNotificationConfigs` |
-| Extended Agent Card | `fetchExtendedAgentCard` | `GetExtendedAgentCard` | `GET /extendedAgentCard` |
+Implements A2A revision 1.0.1. The gRPC binding is not implemented.
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

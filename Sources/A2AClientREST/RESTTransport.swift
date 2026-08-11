@@ -2,7 +2,11 @@ import Foundation
 import A2ACore
 import A2AClientCore
 
-/// HTTP+JSON / REST バインディング（仕様 §11）。リソース URL と標準 HTTP 動詞を使い、封筒を持たない。
+/// The HTTP+JSON binding (spec §11): resource paths and standard verbs, with no envelope — a
+/// response body is the payload itself, and streams carry bare events.
+///
+/// Errors come back as a `google.rpc.Status` body, which becomes `A2AError.rpc`; when the body
+/// cannot be read that way, the status alone becomes `A2AError.http`.
 public struct RESTTransport: A2ATransport {
     private let http: HTTPClient
     private let baseURL: URL
@@ -120,7 +124,7 @@ public struct RESTTransport: A2ATransport {
                 let decoder = A2AJSON.makeDecoder()
                 do {
                     for try await event in SSEParser.events(from: bytes) {
-                        // REST は封筒なし。data は StreamResponse そのもの。
+                        // No envelope in this binding: each event's data is the payload itself.
                         let result = try decoder.decode(StreamResponse.self, from: Data(event.data.utf8))
                         continuation.yield(result)
                     }

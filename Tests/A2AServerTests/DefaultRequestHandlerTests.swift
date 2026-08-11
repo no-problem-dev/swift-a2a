@@ -3,7 +3,7 @@ import Testing
 import A2ACore
 @testable import A2AServer
 
-/// `execute` 内でユーザー入力をそのまま artifact 化し completed まで遷移させる Echo executor。
+/// Turns the user's input into an artifact and completes.
 struct EchoExecutor: AgentExecutor {
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)
@@ -19,7 +19,7 @@ struct EchoExecutor: AgentExecutor {
     }
 }
 
-/// 1 ターン目で input-required に入って return し、2 ターン目で completed にする executor。
+/// Stops for input on the first run, completes on the second.
 struct InputRequiredExecutor: AgentExecutor {
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
         let updater = TaskUpdater(eventQueue: eventQueue, taskId: context.taskId, contextId: context.contextId)

@@ -1,12 +1,14 @@
 import Foundation
 
-/// パート列を宣言的に組み立てる Result Builder。
+/// Assembles a message's parts from a block, so multi-part content reads as a list rather than an
+/// array literal.
 ///
-/// 文字列リテラルは自動的にテキストパートになる。
+/// A bare string becomes a text part, `if` and `for` are supported, and an array of parts splices
+/// in as its elements.
 ///
 /// ```swift
 /// let message = Message(role: .user) {
-///     "天気を教えて"
+///     "What is the weather?"
 ///     Part.file(uri: "https://example.com/map.png", mediaType: "image/png")
 /// }
 /// ```
@@ -23,7 +25,10 @@ public enum PartBuilder {
 }
 
 extension Message {
-    /// ビルダーでパートを組み立ててメッセージを作成。`messageId` 省略時は UUID を採番。
+    /// Creates a message whose parts come from a builder block.
+    ///
+    /// A fresh UUID is generated for `messageId` unless one is supplied — note that the default is
+    /// evaluated per call, so each message gets its own.
     public init(
         messageId: MessageID = MessageID(UUID().uuidString),
         role: Role,
@@ -42,12 +47,12 @@ extension Message {
         )
     }
 
-    /// ユーザーからのテキストメッセージを簡易作成。
+    /// Creates a single-text-part message from the client.
     public static func user(_ text: String, messageId: MessageID = MessageID(UUID().uuidString)) -> Message {
         Message(messageId: messageId, role: .user, parts: [.text(text)])
     }
 
-    /// エージェントからのテキストメッセージを簡易作成。
+    /// Creates a single-text-part message from the agent.
     public static func agent(_ text: String, messageId: MessageID = MessageID(UUID().uuidString)) -> Message {
         Message(messageId: messageId, role: .agent, parts: [.text(text)])
     }

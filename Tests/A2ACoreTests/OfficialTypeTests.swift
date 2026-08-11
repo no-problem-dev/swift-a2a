@@ -3,21 +3,21 @@ import Testing
 import StructuredDataCore
 @testable import A2ACore
 
-/// 公式 a2a-python の `tests/test_types.py`（proto JSON / ParseDict・MessageToDict）の
-/// fixture と assertion を移植し、proto3 セマンティクスへの一致を検証する。
+/// Ports the fixtures and assertions of the reference implementation's type tests, checking that
+/// this encoding matches proto3 JSON semantics in both directions.
 @Suite("Official type parity (test_types.py)")
 struct OfficialTypeTests {
     let decoder = A2AJSON.makeDecoder()
     let encoder = A2AJSON.makeEncoder()
 
-    /// エンコード結果のトップレベルキー集合（MessageToDict の default 省略検証用）。
+    /// The top-level keys of the encoded form, for asserting which defaults were omitted.
     func topLevelKeys<T: Encodable>(_ value: T) throws -> Set<String> {
         let data = try encoder.encode(value)
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         return Set(object.keys)
     }
 
-    // MINIMAL_AGENT_CARD — capabilities は {}、interface は protocolVersion 省略
+    // The minimal card: empty capabilities, and an interface with no protocolVersion.
     static let minimalAgentCard = """
     {
       "capabilities": {},
@@ -38,11 +38,11 @@ struct OfficialTypeTests {
         #expect(card.skills.count == 1)
         #expect(card.skills.first?.id == "skill-123")
         #expect(card.supportedInterfaces.first?.url == "http://example.com/agent")
-        // protocolVersion は欠落 → proto3 既定の空文字列（例外を投げない）
+        // A missing protocolVersion decodes to the proto3 default, the empty string, rather than throwing.
         #expect(card.supportedInterfaces.first?.protocolVersion == "")
-        // provider は未設定
+        // No provider on this card.
         #expect(card.provider == nil)
-        // capabilities は {} → 全て未設定
+        // An empty capabilities object leaves every flag unset.
         #expect(card.capabilities.streaming == nil)
         #expect(card.capabilities.extensions.isEmpty)
     }
@@ -61,7 +61,7 @@ struct OfficialTypeTests {
         #expect(reDecoded == skill)
     }
 
-    // MessageToDict は default 値を省略する（test_message_to_dict_preserves_structure）
+    // Encoding omits fields equal to their proto3 default.
     @Test func messageToDictOmitsDefaults() throws {
         let message = Message(messageId: "msg-123", role: .user, parts: [.text("Hello")])
         #expect(try topLevelKeys(message) == ["role", "messageId", "parts"])
@@ -72,10 +72,10 @@ struct OfficialTypeTests {
         #expect(object["messageId"] as? String == "msg-123")
         let parts = object["parts"] as! [[String: Any]]
         #expect(parts[0]["text"] as? String == "Hello")
-        #expect(parts[0].keys.count == 1)   // text のみ
+        #expect(parts[0].keys.count == 1)   // Only the text member.
     }
 
-    // 空メッセージ → proto3 既定値（test_default_values）
+    // An empty message decodes to proto3 defaults throughout.
     @Test func emptyMessageDecodesToDefaults() throws {
         let message = try decoder.decode(Message.self, from: Data("{}".utf8))
         #expect(message.role == .unspecified)
@@ -90,7 +90,7 @@ struct OfficialTypeTests {
         #expect(status.timestamp == nil)
     }
 
-    // ParseDict Task with nested history（test_parse_dict_task）
+    // A task decoded with its nested history intact.
     @Test func parseDictTaskWithHistory() throws {
         let json = """
         {"id":"task-123","contextId":"ctx-456","status":{"state":"TASK_STATE_WORKING"},
@@ -104,7 +104,7 @@ struct OfficialTypeTests {
         #expect(task.history.first?.role == .user)
     }
 
-    // Part 各種（test_part_with_url / _raw / _data）
+    // Each part content kind: url, raw and data.
     @Test func partVariants() throws {
         let url = try decoder.decode(Part.self, from: Data(#"{"url":"file:///path/to/file.txt","mediaType":"text/plain"}"#.utf8))
         #expect(url.uri == "file:///path/to/file.txt")
@@ -118,7 +118,7 @@ struct OfficialTypeTests {
         #expect(data.data == .object(["key": "value"]))
     }
 
-    // enum の文字列表現（test_role_enum / test_task_state_enum）
+    // Enums travel as their Protocol Buffer names.
     @Test func enumProtoNames() {
         #expect(Role.unspecified.rawValue == "ROLE_UNSPECIFIED")
         #expect(Role.user.rawValue == "ROLE_USER")
@@ -129,7 +129,7 @@ struct OfficialTypeTests {
         #expect(TaskState.authRequired.rawValue == "TASK_STATE_AUTH_REQUIRED")
     }
 
-    // SecurityScheme oneof（test_security_scheme）
+    // The security scheme oneof, discriminated by member name.
     @Test func securitySchemeApiKeyOneof() throws {
         let json = #"{"apiKeySecurityScheme":{"name":"X-API-KEY","location":"header"}}"#
         let scheme = try decoder.decode(SecurityScheme.self, from: Data(json.utf8))
@@ -138,7 +138,7 @@ struct OfficialTypeTests {
         #expect(apiKey.location == .header)
     }
 
-    // Task with artifact + data part（test_task_with_artifacts）
+    // A task carrying an artifact whose part is structured data.
     @Test func taskWithArtifactDataPart() throws {
         let json = """
         {"id":"task-abc","contextId":"session-xyz","status":{"state":"TASK_STATE_COMPLETED"},

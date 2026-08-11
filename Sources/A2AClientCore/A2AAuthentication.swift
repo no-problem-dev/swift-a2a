@@ -3,18 +3,23 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// クライアントの認証方式。
+/// What the client sends to prove who it is.
+///
+/// Fixed for the life of a client: the credential is captured at construction and never refreshed,
+/// so an expiring token means building a new client. Applied last when a request is assembled, so
+/// these values win over any header set earlier.
 public enum A2AAuthentication: Sendable {
-    /// 認証なし。
+    /// Send nothing.
     case none
-    /// Bearer トークン（`Authorization: Bearer <token>`）。
+    /// Send `Authorization: Bearer <token>`.
     case bearer(String)
-    /// API キー（任意ヘッダ）。
+    /// Send a key in a header of your choosing. Query and cookie placements are not supported here
+    /// even though an agent card may advertise them.
     case apiKey(header: String, value: String)
-    /// 任意のカスタムヘッダ群。
+    /// Send arbitrary headers, for schemes the cases above do not cover.
     case headers([String: String])
 
-    /// リクエストへ認証情報を付与。
+    /// Applies the credential to an outgoing request.
     func apply(to request: inout URLRequest) {
         switch self {
         case .none:

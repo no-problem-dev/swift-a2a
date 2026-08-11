@@ -1,16 +1,25 @@
 # ``A2ACore``
 
-A2A プロトコルの Swift 実装 — swift-a2a パッケージ全モジュールが共有するデータモデル・操作型・プロトコル定数。
+The A2A data model and its ProtoJSON encoding, shared by every other module in the package.
 
 ## Overview
 
-swift-a2a は Google の Agent-to-Agent（A2A）プロトコル（v1.0.1）をモジュール形式で実装した Swift ライブラリ。必要な層だけを導入できるよう 7 つのライブラリに分割されており、``A2ACore`` はその共有基盤。タスク・メッセージ・パート・アーティファクト・Agent Card からなる完全な A2A データモデル、操作リクエスト／レスポンス型全種、ストリームイベント型、JSON コーデックを定義する。他のすべてのライブラリは ``A2ACore`` に依存する。
+swift-a2a implements the Agent2Agent protocol, revision 1.0.1. It is split into seven libraries so
+you take only the layer you need, and ``A2ACore`` is what they all rest on: the task, message,
+part, artifact and agent-card types, every operation's request and response, the streaming event
+types, and the coders that write them the way the specification requires.
 
-クライアント側ライブラリ `A2AClientREST` と `A2AClientJSONRPC` はそれぞれ、共有の `A2AClient` ファサードに具体的なトランスポートバインディングを組み合わせる。`A2AClientREST` は HTTP+JSON REST バインディング（仕様 §11）、`A2AClientJSONRPC` は JSON-RPC 2.0 バインディング（仕様 §9）を使用する。両モジュールは ``A2ACore`` を再エクスポートするため、1 つの import 文でメッセージの構築・送信に必要なものがすべて揃う。
+Nothing in this module talks to a network. It is the vocabulary; the bindings move it.
 
-サーバ側は 3 つの補完ライブラリで構成される。`A2AServer` はトランスポート非依存フレームワークを提供し、`AgentExecutor` と `RequestHandler` プロトコル、ライフサイクル管理を担う `TaskManager` actor、プロトタイピング向けのインメモリストア実装を含む。`A2AServerREST` と `A2AServerJSONRPC` はそれぞれ、生バイト列を `RequestHandler` 呼び出しに変換する薄い HTTP 非依存ディスパッチャを追加する。最後に `A2AInProcess` は、`A2AClient` を同一プロセス内の `RequestHandler` へ直結させ、ネットワーク通信なしに動作させる。これにより実際のエージェント実装に対してユニットテストを書くのが容易になる。
+On the client side, `A2AClientREST` and `A2AClientJSONRPC` each pair the shared `A2AClient` facade
+with one transport — the HTTP+JSON binding of spec §11, and the JSON-RPC 2.0 binding of §9. The
+specification requires the two to be functionally equivalent, so the choice is the agent's, not
+yours. Both modules re-export ``A2ACore``, so one import is enough to build and send a message.
 
-次の例では ``Message/user(_:messageId:)`` でテキストメッセージを作成し、REST クライアントを通じてリモートエージェントの結果を検査する:
+On the server side, `A2AServer` is transport-agnostic: implement `AgentExecutor`, hand it to
+`DefaultRequestHandler`, and let `A2AServerREST` or `A2AServerJSONRPC` translate bytes into handler
+calls. `A2AInProcess` connects a client straight to a handler with no serialization at all, which
+is how you test an agent without standing up a server.
 
 ```swift
 import A2ACore
@@ -18,24 +27,42 @@ import A2AClientREST
 
 let client = A2AClient.rest(baseURL: URL(string: "https://agent.example.com")!)
 
-let message = Message.user("添付ドキュメントを要約して。")
+let message = Message.user("Summarize the attached document.")
 let response = try await client.sendMessage(message)
 
 switch response {
 case .task(let task):
-    print("タスク作成:", task.id.rawValue, "状態:", task.status.state)
+    print("Task", task.id.rawValue, "is", task.status.state)
 case .message(let reply):
-    print("即時返信:", reply.text)
+    print("Replied:", reply.text)
 }
 ```
 
+### Reading the wire format
+
+Two conventions explain most of what the encoding does, and both come from Protocol Buffers rather
+than from anything Swift would suggest.
+
+Enums travel as their Protocol Buffer names — `ROLE_USER`, `TASK_STATE_WORKING` — and an
+unrecognized name decodes to `unspecified` rather than failing, so a client keeps working against
+an agent that has learned a new state. See ``ProtoEnum`` for the one place that tolerance costs
+something.
+
+Fields equal to their proto3 default are omitted on the way out and defaulted on the way in, so an
+absent field and an empty one are the same thing. This is why decoding a required-looking field
+that is missing yields an empty value instead of an error.
+
+Where this implementation departs from the canonical definitions on purpose, the type says so:
+``SecurityRequirement`` and ``OAuthFlows`` both follow the specification's examples and the
+ecosystem rather than the proto shape.
+
 ## Topics
 
-### プロトコル定数
+### Protocol Constants
 
 - ``A2AProtocol``
 
-### データモデル — タスク
+### Tasks
 
 - ``A2ATask``
 - ``TaskStatus``
@@ -43,7 +70,7 @@ case .message(let reply):
 - ``TaskID``
 - ``ContextID``
 
-### データモデル — メッセージとパート
+### Messages and Parts
 
 - ``Message``
 - ``Part``
@@ -51,12 +78,12 @@ case .message(let reply):
 - ``Role``
 - ``MessageID``
 
-### データモデル — アーティファクト
+### Artifacts
 
 - ``Artifact``
 - ``ArtifactID``
 
-### データモデル — Agent Card
+### Agent Cards
 
 - ``AgentCard``
 - ``AgentSkill``
@@ -66,9 +93,10 @@ case .message(let reply):
 - ``AgentExtension``
 - ``AgentCardSignature``
 
-### データモデル — セキュリティスキーム
+### Security Schemes
 
 - ``SecurityScheme``
+- ``SecurityRequirement``
 - ``APIKeySecurityScheme``
 - ``HTTPAuthSecurityScheme``
 - ``OAuth2SecurityScheme``
@@ -81,12 +109,12 @@ case .message(let reply):
 - ``PasswordOAuthFlow``
 - ``DeviceCodeOAuthFlow``
 
-### データモデル — プッシュ通知
+### Push Notifications
 
 - ``TaskPushNotificationConfig``
 - ``AuthenticationInfo``
 
-### 操作
+### Operations
 
 - ``SendMessageRequest``
 - ``SendMessageConfiguration``
@@ -102,17 +130,17 @@ case .message(let reply):
 - ``ListTaskPushNotificationConfigsResponse``
 - ``GetExtendedAgentCardRequest``
 
-### ストリーミングイベント
+### Streaming Events
 
 - ``StreamResponse``
 - ``TaskStatusUpdateEvent``
 - ``TaskArtifactUpdateEvent``
 
-### 識別子
+### Identifiers
 
 - ``A2AIdentifier``
 
-### JSON コーデックとメタデータ
+### Encoding
 
 - ``A2AJSON``
 - ``A2AMetadata``

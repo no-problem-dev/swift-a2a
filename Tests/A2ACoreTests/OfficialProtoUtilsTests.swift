@@ -2,12 +2,12 @@ import Foundation
 import Testing
 @testable import A2ACore
 
-/// 公式 a2a-python の `tests/utils/test_proto_utils.py` のうち、Swift の Codable 層に対応する
-/// ケース（`to_stream_response` の 4 variant）を移植する。
+/// Ports the cases from the reference implementation's proto-utils tests that have a counterpart
+/// in the Codable layer here — the four stream-response variants.
 ///
-/// 備考: `make_dict_serializable` / `normalize_large_integers_to_strings` は protobuf 固有の
-/// Python ユーティリティ、`validate_proto_required_fields` はサーバ側の必須検証であり、
-/// proto3 寛容デコードを採る本クライアントには該当しないため移植対象外。
+/// The rest do not port. Two are Python-side protobuf helpers with no equivalent, and required-field
+/// validation is a server-side check this client deliberately does not perform: proto3 decoding here
+/// defaults missing fields rather than rejecting them.
 @Suite("Official proto_utils parity (StreamResponse)")
 struct OfficialProtoUtilsTests {
     let decoder = A2AJSON.makeDecoder()

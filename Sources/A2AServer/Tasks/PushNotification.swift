@@ -4,19 +4,26 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// プッシュ通知設定の永続化（a2a-python `PushNotificationConfigStore`）。
+/// Where webhook registrations live.
 ///
-/// 呼び出し系メソッドは owner ごとにスコープ分離する。配信系（`configs(forDispatch:)`）は
-/// owner 横断で全 config を返す（a2a-python `get_info_for_dispatch`）。
+/// Two access patterns, deliberately different. The context-taking methods serve client requests
+/// and are scoped by owner, so one caller cannot see another's webhooks. Delivery uses
+/// `configs(forDispatch:)`, which crosses owners on purpose: an event belongs to a task, and every
+/// registration on that task must receive it regardless of who made it.
 public protocol PushNotificationConfigStore: Sendable {
+    /// Stores a configuration, replacing any already held under the same `id` for that task.
     func set(_ config: TaskPushNotificationConfig, context: ServerCallContext) async throws -> TaskPushNotificationConfig
+    /// Returns the configurations the caller registered on a task.
     func get(taskId: TaskID, context: ServerCallContext) async throws -> [TaskPushNotificationConfig]
-    /// 配信用に owner 横断で全 config を取得（sender が使用）。
+    /// Returns every configuration on a task, from every owner. For delivery only — never answer a
+    /// client request with this.
     func configs(forDispatch taskId: TaskID) async throws -> [TaskPushNotificationConfig]
+    /// Removes one of the caller's configurations. Removing one that does not exist is not an error.
     func delete(taskId: TaskID, configId: String, context: ServerCallContext) async throws
 }
 
-/// context 省略時は未認証コンテキスト（単一スコープ）として扱う利便オーバーロード。
+/// Overloads that drop the context, standing in for an unauthenticated caller — that is, the one
+/// shared scope. Convenient in tests; wrong in a deployment that serves more than one client.
 public extension PushNotificationConfigStore {
     func set(_ config: TaskPushNotificationConfig) async throws -> TaskPushNotificationConfig {
         try await set(config, context: ServerCallContext())
@@ -29,16 +36,24 @@ public extension PushNotificationConfigStore {
     }
 }
 
-/// タスク更新を webhook へ送信する（a2a-python `PushNotificationSender`）。
+/// Delivers a task event to one registered destination.
+///
+/// Deliberately cannot fail: `send` neither throws nor reports a result, so delivery problems are
+/// the sender's to handle. Retry and dead-lettering belong inside an implementation, not around it.
 public protocol PushNotificationSender: Sendable {
+    /// Delivers one event. Called once per registered configuration, in no guaranteed order.
     func send(_ event: StreamResponse, to config: TaskPushNotificationConfig) async
 }
 
-/// webhook へ `StreamResponse` JSON を HTTP POST する標準実装（a2a-python `BasePushNotificationSender._dispatch_notification`）。
+/// POSTs each event as JSON to the registered URL.
 ///
-/// payload は `StreamResponse`（task / message / statusUpdate / artifactUpdate のいずれか）。
-/// `config.token` があれば `X-A2A-Notification-Token` ヘッダを付与する。
-/// テスト容易性のため実 POST は注入可能（既定は URLSession）。
+/// The body is the event itself, in the same shape a stream would deliver. A configuration's token
+/// travels in the `X-A2A-Notification-Token` header so the receiver can confirm the delivery is
+/// one it asked for; the configuration's `authentication` is *not* applied.
+///
+/// Everything fails silently: an unparseable URL, an encoding failure, a non-2xx response and a
+/// connection error all end in the event being dropped with nothing recorded. Supply your own
+/// `post` to get logging or retries.
 public struct HTTPPushNotificationSender: PushNotificationSender {
     public typealias Post = @Sendable (_ url: URL, _ body: Data, _ headers: [String: String]) async throws -> Void
 
@@ -69,11 +84,11 @@ public struct HTTPPushNotificationSender: PushNotificationSender {
     }
 }
 
-/// push 通知を**プロセス内**で配信する具体トランスポート（HTTP/gRPC と同列のもう1つの実装）。
+/// Hands each event to a closure instead of sending it anywhere.
 ///
-/// A2A の push 抽象（`PushNotificationConfig` 登録・状態変化トリガ・`StreamResponse` payload）は
-/// そのままに、配信だけを HTTP POST ではなく注入された Swift クロージャ（sink）で行う。
-/// in-process ワーカー（`InProcessTransport`）が同一プロセスのホストへ完了イベントを届ける用途。
+/// The registration and triggering machinery is unchanged — only the delivery step differs — so an
+/// in-process agent can notify its host through the same path a remote one would use over HTTP.
+/// The configuration's URL is passed through untouched and may be a placeholder.
 public struct InProcessPushNotificationSender: PushNotificationSender {
     public typealias Sink = @Sendable (_ event: StreamResponse, _ config: TaskPushNotificationConfig) async -> Void
 
@@ -88,8 +103,12 @@ public struct InProcessPushNotificationSender: PushNotificationSender {
     }
 }
 
+/// Holds webhook configurations in a dictionary, partitioned by owner. For prototyping and tests —
+/// nothing survives a restart.
+///
+/// A configuration with no `id` is stored under the task ID, so registering twice without an
+/// explicit id replaces rather than accumulates.
 public actor InMemoryPushNotificationConfigStore: PushNotificationConfigStore {
-    /// owner -> taskId -> [config]（a2a-python InMemoryPushNotificationConfigStore）。
     private var configsByOwner: [String: [TaskID: [TaskPushNotificationConfig]]] = [:]
     private let ownerResolver: OwnerResolver
 
@@ -105,7 +124,8 @@ public actor InMemoryPushNotificationConfigStore: PushNotificationConfigStore {
         guard let taskId = config.taskId else {
             throw A2AServerError.invalidParams("TaskPushNotificationConfig.taskId is required")
         }
-        // a2a-python: id 未指定なら taskId を既定 id に採番（同一 id は置換）。
+        // Default the id to the task id, so an unnamed registration is replaced rather than
+        // duplicated on the next call.
         var stored = config
         if stored.id == nil { stored.id = taskId.rawValue }
         let owner = ownerResolver(context)

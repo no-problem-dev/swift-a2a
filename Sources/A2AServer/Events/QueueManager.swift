@@ -1,17 +1,27 @@
 import A2ACore
 
-/// タスク ID ごとの `EventQueue` を管理する（a2a-python `QueueManager`）。streaming と subscribe で共有。
+/// Keeps one event queue per running task, so a later subscription can join the stream a send
+/// already started.
+///
+/// A queue exists only while its task is running: the handler closes and unregisters it when the
+/// executor finishes, and a subscription to a task with no live queue cannot be served.
+///
+/// Implement this over shared storage to run more than one server process; the in-memory
+/// implementation confines a task's stream to the process that started it.
 public protocol QueueManager: Sendable {
-    /// 指定タスク ID の `EventQueue` を登録する。
+    /// Registers an existing queue under a task ID, replacing any already registered.
     func add(_ taskId: TaskID, queue: EventQueue) async
-    /// 指定タスク ID の `EventQueue` を返す。未登録なら `nil`。
+    /// Returns the task's queue, or `nil` if it has none — which is the case once the task has
+    /// finished.
     func get(_ taskId: TaskID) async -> EventQueue?
-    /// キューを閉じ、登録を解除する。
+    /// Closes the task's queue and unregisters it, finishing every stream tapped from it.
     func close(_ taskId: TaskID) async
-    /// 既存のキューがあればそれを返し、なければ新規作成して登録・返す。
+    /// Returns the task's queue, creating and registering one if it has none.
     func createOrGet(_ taskId: TaskID) async -> EventQueue
 }
 
+/// Holds queues in a dictionary. Suitable for a single process; queues do not survive a restart
+/// and are invisible to other instances.
 public actor InMemoryQueueManager: QueueManager {
     private var queues: [TaskID: EventQueue] = [:]
 

@@ -1,8 +1,13 @@
-/// 呼び出しコンテキストから所有者スコープ（owner）を導出する（a2a-python `OwnerResolver`）。
+/// Derives the storage scope a caller may see, which is how one agent serves many clients without
+/// leaking tasks between them (spec §254, §13.1).
 ///
-/// store はこの owner ごとにデータを分離し、spec §254/§13.1 の認可スコープ要件を満たす。
+/// Stores partition by the returned string and never look across partitions, so a resolver that
+/// returns a constant makes every task visible to everyone.
 public typealias OwnerResolver = @Sendable (ServerCallContext) -> String
 
-/// 既定の owner 解決（a2a-python `resolve_user_scope`）。
-/// 認証ユーザ名を owner とし、未認証は空文字（単一スコープ）。
+/// Scopes by authenticated username, putting every unauthenticated caller in one shared partition.
+///
+/// The default for the in-memory stores. Since the transport dispatchers do not populate the call
+/// context, this yields a single shared scope unless the HTTP layer sets a user — which is
+/// adequate for a single-tenant agent and wrong for anything else.
 public let resolveUserScope: OwnerResolver = { $0.user?.username ?? "" }

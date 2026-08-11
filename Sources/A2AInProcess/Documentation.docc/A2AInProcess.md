@@ -1,41 +1,52 @@
 # ``A2AInProcess``
 
-インプロセス A2A バインディング — `A2AClient` を同一プロセス内の `RequestHandler` へ直結し、HTTP とシリアライズのオーバーヘッドをゼロにする。
+Wires a client straight to a handler in the same process — no HTTP, no serialization.
 
 ## Overview
 
-`A2AInProcess` はテストおよびエージェントを同一バイナリ内に組み込む用途向け。このモジュールを import すると `A2ACore`・`A2AClientCore`・`A2AServer` が再エクスポートされるため、1 つの import でフルスタックが利用可能になる。
+`A2AInProcess` is for testing an agent, and for embedding one in the binary that calls it. The
+client protocol is implemented by calling a `RequestHandler` directly, so values pass as Swift
+types and round-trip latency disappears.
 
-`A2AClient.inProcess(handler:context:)` ファクトリを呼び出して ``InProcessTransport`` を内部に持つクライアントを生成する。このトランスポートは各操作を JSON にシリアライズしたりネットワークソケットを開いたりせず、`RequestHandler` へ直接転送する。ラウンドトリップのレイテンシが無視できるほど小さくなり、テスト出力が決定論的になる。
+Importing this module re-exports `A2ACore`, `A2AClientCore` and `A2AServer`, so one import brings
+the whole stack.
 
 ```swift
-import A2ACore
-import A2AServer
 import A2AInProcess
 
-// サーバフレームワークでハンドラを構築
 let card = AgentCard(
     name: "Echo Agent",
-    description: "入力をそのまま返すエージェント。",
+    description: "Returns whatever it is sent.",
     supportedInterfaces: [AgentInterface(url: "inprocess://local", protocolBinding: "JSONRPC")],
     version: "1.0",
     capabilities: AgentCapabilities()
 )
 let handler = DefaultRequestHandler(agentCard: card, executor: EchoExecutor())
 
-// HTTP を介さずクライアントをハンドラへ直結
 let client = A2AClient.inProcess(handler: handler)
 
-let response = try await client.sendMessage(Message.user("こんにちは！"))
+let response = try await client.sendMessage(Message.user("Hello!"))
 if case .task(let task) = response {
-    print("タスク状態:", task.status.state)
+    print("Task state:", task.status.state)
 }
 ```
 
-テスト中に認証情報や他のコール毎メタデータを注入する必要がある場合は、`inProcess(handler:context:)` にカスタムの `ServerCallContext` を渡す。
+Pass a `ServerCallContext` to `inProcess(handler:context:)` to run as an authenticated caller. It is
+fixed for the life of the client, so testing two identities means two clients.
+
+### What this transport does not exercise
+
+Speed comes from skipping work, and the skipped work is exactly what a remote binding would test.
+Nothing is encoded, so a payload that would fail to serialize passes unnoticed; there is no HTTP
+layer, so `fetchAgentCard()` — which always goes over the network — cannot be used on such a
+client. Error handling also differs: `A2AServerError` is translated to `A2AError.rpc` as a remote
+binding would, but any other error the handler throws propagates unchanged rather than becoming a
+generic internal error.
+
+Treat a passing in-process test as evidence about the agent, not about the wire format.
 
 ## Topics
 
-### トランスポート
+### Transport
 
 - ``InProcessTransport``

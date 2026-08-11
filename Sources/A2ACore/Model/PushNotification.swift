@@ -1,18 +1,23 @@
-/// タスクのプッシュ通知設定（A2A `TaskPushNotificationConfig`）。
+/// Where to deliver a task's updates when the client is not listening on a stream.
 ///
-/// v1.0 で旧 `PushNotificationConfig` と統合され、タスク ID・設定 ID を含む単一の型になった。
+/// v1.0 folded the older separate `PushNotificationConfig` into this single type, which is why the
+/// task and config identifiers live here rather than in a wrapper.
 public struct TaskPushNotificationConfig: Sendable, Hashable {
-    /// ルーティング用の不透明識別子（`AgentInterface.tenant` と一致させる）。
+    /// An opaque routing identifier for multi-tenant deployments, matching `AgentInterface.tenant`.
     public var tenant: String?
-    /// この設定の一意識別子。
+    /// Identifies this configuration. The server assigns one when it is absent, and re-registering
+    /// with the same value replaces the earlier configuration rather than adding a second.
     public var id: String?
-    /// 対象タスクの ID。
+    /// The task whose updates this covers. Required by the server, optional here because the
+    /// binding fills it in from the request path.
     public var taskId: TaskID?
-    /// 通知の送信先 URL。
+    /// The webhook to POST updates to.
     public var url: String
-    /// このタスク／セッションに固有のトークン。
+    /// A value the receiver can check to confirm a delivery is the one it asked for. Sent in the
+    /// `X-A2A-Notification-Token` header, not the body.
     public var token: String?
-    /// 通知送信時の認証情報。
+    /// Credentials for the webhook itself. Carried through but never applied by the sender shipped
+    /// here — supply your own sender if the webhook requires authentication.
     public var authentication: AuthenticationInfo?
 
     public init(
@@ -58,11 +63,11 @@ extension TaskPushNotificationConfig: Codable {
     }
 }
 
-/// プッシュ通知の認証情報（A2A `AuthenticationInfo`）。
+/// Credentials an agent should present when calling a webhook.
 public struct AuthenticationInfo: Sendable, Hashable {
-    /// HTTP 認証スキーム（例 `Bearer`, `Basic`, `Digest`）。
+    /// The HTTP authentication scheme: `Bearer`, `Basic`, `Digest`, and so on.
     public var scheme: String
-    /// 資格情報（スキーム依存。Bearer ならトークン等）。
+    /// The credential itself, interpreted according to `scheme`.
     public var credentials: String?
 
     public init(scheme: String, credentials: String? = nil) {

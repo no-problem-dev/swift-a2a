@@ -4,11 +4,13 @@ import A2ACore
 import FoundationNetworking
 #endif
 
-/// A2A エージェントと通信する高水準クライアント。
+/// The client you call. Every method delegates to a transport, so the same code works over REST,
+/// JSON-RPC or a direct in-process handler.
 ///
-/// バインディング非依存のファサードで、具体的な通信は注入された ``A2ATransport`` が担う。
-/// 通常は `A2AClientREST` / `A2AClientJSONRPC` が提供する `A2AClient.rest(...)` /
-/// `A2AClient.jsonRPC(...)` ファクトリ経由で生成する。
+/// Build one with the factory the binding module adds — `A2AClient.rest(baseURL:)`,
+/// `A2AClient.jsonRPC(endpoint:)` or `A2AClient.inProcess(handler:)` — rather than by hand.
+///
+/// A value type with no mutable state: it is safe to share, and it holds no connection of its own.
 public struct A2AClient: Sendable {
     public let configuration: A2AClientConfiguration
     public let transport: any A2ATransport
@@ -22,7 +24,10 @@ public struct A2AClient: Sendable {
 
     // MARK: - Messaging
 
-    /// メッセージを送信し、完了結果（タスクまたはメッセージ）を取得。
+    /// Sends a message and waits for the agent to finish or stop for input.
+    ///
+    /// Returns a task when the agent tracked the work, or a message when it simply replied. Pass
+    /// `returnImmediately` in the configuration to get the task back as soon as it exists instead.
     public func sendMessage(
         _ message: Message,
         configuration: SendMessageConfiguration? = nil,
@@ -33,12 +38,15 @@ public struct A2AClient: Sendable {
         )
     }
 
-    /// リクエストを直接指定してメッセージを送信。
+    /// Sends a fully built request, for the fields the convenience overload does not expose.
     public func sendMessage(_ request: SendMessageRequest) async throws -> SendMessageResponse {
         try await transport.sendMessage(request)
     }
 
-    /// メッセージを送信し、更新を SSE ストリームで受信。
+    /// Sends a message and returns the updates as they happen.
+    ///
+    /// The stream ends when the task reaches a terminal or interrupted state, or when the agent
+    /// replies with a message. Requires the agent to advertise the streaming capability.
     public func streamMessage(
         _ message: Message,
         configuration: SendMessageConfiguration? = nil,
@@ -51,48 +59,62 @@ public struct A2AClient: Sendable {
 
     // MARK: - Tasks
 
-    /// タスクの現在状態を取得。
+    /// Fetches a task as it stands.
+    ///
+    /// - Parameters:
+    ///   - id: The task to fetch.
+    ///   - historyLength: How many of the most recent messages to include. All of them by default.
     public func getTask(_ id: TaskID, historyLength: Int? = nil) async throws -> A2ATask {
         try await transport.getTask(GetTaskRequest(id: id, historyLength: historyLength))
     }
 
-    /// タスク一覧を取得。
+    /// Fetches a page of tasks, newest first by status timestamp.
     public func listTasks(_ request: ListTasksRequest = ListTasksRequest()) async throws -> ListTasksResponse {
         try await transport.listTasks(request)
     }
 
-    /// タスクをキャンセル。
+    /// Asks the agent to stop a task, returning it in its final state.
+    ///
+    /// - Throws: `A2AError.rpc` with `taskNotCancelable` if the task has already finished, or if
+    ///   the agent declines to cancel it.
     public func cancelTask(_ id: TaskID, metadata: A2AMetadata? = nil) async throws -> A2ATask {
         try await transport.cancelTask(CancelTaskRequest(id: id, metadata: metadata))
     }
 
-    /// 非終端タスクの更新を購読。
+    /// Follows a task that is already running.
+    ///
+    /// The first event is always a snapshot of the task as it stands, so nothing is missed between
+    /// the fetch and the subscription.
+    ///
+    /// - Throws: `A2AError.rpc` if the task is unknown or has already finished.
     public func subscribeToTask(_ id: TaskID) async throws -> AsyncThrowingStream<StreamResponse, Error> {
         try await transport.subscribeToTask(SubscribeToTaskRequest(id: id))
     }
 
     // MARK: - Push notification configs
 
-    /// プッシュ通知設定を作成。
+    /// Registers a webhook to receive a task's updates.
+    ///
+    /// Re-registering with an existing `id` replaces that configuration rather than adding another.
     public func createPushNotificationConfig(_ config: TaskPushNotificationConfig) async throws -> TaskPushNotificationConfig {
         try await transport.createTaskPushNotificationConfig(config)
     }
 
-    /// プッシュ通知設定を取得。
+    /// Fetches one webhook configuration.
     public func getPushNotificationConfig(taskId: TaskID, id: String) async throws -> TaskPushNotificationConfig {
         try await transport.getTaskPushNotificationConfig(
             GetTaskPushNotificationConfigRequest(taskId: taskId, id: id)
         )
     }
 
-    /// プッシュ通知設定を一覧。
+    /// Lists the webhook configurations registered on a task.
     public func listPushNotificationConfigs(taskId: TaskID) async throws -> ListTaskPushNotificationConfigsResponse {
         try await transport.listTaskPushNotificationConfigs(
             ListTaskPushNotificationConfigsRequest(taskId: taskId)
         )
     }
 
-    /// プッシュ通知設定を削除。
+    /// Removes a webhook configuration.
     public func deletePushNotificationConfig(taskId: TaskID, id: String) async throws {
         try await transport.deleteTaskPushNotificationConfig(
             DeleteTaskPushNotificationConfigRequest(taskId: taskId, id: id)
@@ -101,7 +123,14 @@ public struct A2AClient: Sendable {
 
     // MARK: - Agent Card
 
-    /// `/.well-known/agent-card.json` から Agent Card を取得（バインディング非依存の GET）。
+    /// Fetches the agent's public card from the host's well-known path.
+    ///
+    /// A plain GET that bypasses the transport, so it works the same whichever binding the client
+    /// was built with. The base URL's path, query and fragment are discarded — the card is looked
+    /// up at the host root, not relative to the endpoint.
+    ///
+    /// - Throws: `A2AError.http` on a non-2xx response, `A2AError.decoding` if the body is not a
+    ///   card, `A2AError.invalidResponse` if the base URL cannot be rewritten.
     public func fetchAgentCard() async throws -> AgentCard {
         guard var components = URLComponents(url: configuration.baseURL, resolvingAgainstBaseURL: false) else {
             throw A2AError.invalidResponse("Invalid base URL")
@@ -125,7 +154,12 @@ public struct A2AClient: Sendable {
         }
     }
 
-    /// 認証済み拡張 Agent Card を取得。
+    /// Fetches the fuller card available to authenticated callers.
+    ///
+    /// Unlike `fetchAgentCard()` this goes through the transport, so it carries the credential.
+    ///
+    /// - Throws: `A2AError.rpc` with `extendedAgentCardNotConfigured` if the agent does not offer
+    ///   one.
     public func fetchExtendedAgentCard() async throws -> AgentCard {
         try await transport.getExtendedAgentCard(GetExtendedAgentCardRequest())
     }

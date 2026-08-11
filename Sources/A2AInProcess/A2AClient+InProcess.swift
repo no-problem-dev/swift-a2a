@@ -4,7 +4,17 @@ import A2AClientCore
 import A2AServer
 
 extension A2AClient {
-    /// 同一プロセス内の `RequestHandler` に直結した A2A クライアントを生成（HTTP を介さない）。
+    /// Creates a client wired straight to a handler in this process, with no HTTP and no
+    /// serialization.
+    ///
+    /// The base URL is a placeholder that is never dialled, so `fetchAgentCard()` — which always
+    /// goes over HTTP — does not work on such a client. Fetch the card from the handler's own
+    /// configuration instead.
+    ///
+    /// - Parameters:
+    ///   - handler: The server-side handler to call directly.
+    ///   - context: The call context every operation is invoked with. Fixed for the life of the
+    ///     client, so per-call identity needs a separate client.
     public static func inProcess(
         handler: any RequestHandler,
         context: ServerCallContext = ServerCallContext()

@@ -1,6 +1,14 @@
 import A2ACore
 
-/// `StreamResponse` から単一タスクの状態を再構成・永続化する reducer（a2a-python `TaskManager`）。
+/// Folds a task's event stream into its stored state: applies each event to the task and saves it.
+///
+/// One instance per task per run. A status update replaces the status and appends its message to
+/// the history; an artifact update either appends to the artifact with the same ID or replaces it;
+/// a whole-task event overwrites everything; a message event changes nothing, since a direct reply
+/// is not part of a task.
+///
+/// Every applied event triggers a save, so a chatty executor writes to the store as often as it
+/// publishes.
 public actor TaskManager {
     private let taskId: TaskID
     private let contextId: ContextID
@@ -16,8 +24,17 @@ public actor TaskManager {
         self.currentTask = initialTask
     }
 
+    /// The task as folded so far, or `nil` if no event has created it yet.
     public func getTask() -> A2ATask? { currentTask }
 
+    /// Applies one event and persists the result.
+    ///
+    /// An update arriving before any task exists synthesizes a submitted task rather than failing,
+    /// so an executor may publish a status update as its first event.
+    ///
+    /// - Returns: The event, unchanged, so this can sit in a forwarding chain.
+    /// - Throws: Whatever the store throws. The event has already been applied in memory when it
+    ///   does, so the store and this manager can disagree.
     @discardableResult
     public func process(_ event: StreamResponse) async throws -> StreamResponse {
         switch event {

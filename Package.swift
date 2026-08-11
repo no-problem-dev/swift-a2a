@@ -11,19 +11,19 @@ let package = Package(
         .visionOS(.v1),
     ],
     products: [
-        // 規定プロトコル（A2A データモデル + ProtoJSON シリアライズ）だけを使いたいとき
+        // The protocol itself: data model plus ProtoJSON serialization, and nothing else.
         .library(name: "A2ACore", targets: ["A2ACore"]),
-        // REST（HTTP+JSON）バインディングのクライアント
+        // Client speaking the HTTP+JSON binding.
         .library(name: "A2AClientREST", targets: ["A2AClientREST"]),
-        // JSON-RPC バインディングのクライアント
+        // Client speaking the JSON-RPC 2.0 binding.
         .library(name: "A2AClientJSONRPC", targets: ["A2AClientJSONRPC"]),
-        // サーバ実装フレームワーク（AgentExecutor / RequestHandler / TaskStore など、トランスポート非依存）
+        // Server framework: executor, request handler, task store. Transport-agnostic.
         .library(name: "A2AServer", targets: ["A2AServer"]),
-        // JSON-RPC バインディングのサーバ側ディスパッチャ（HTTP 非依存）
+        // Server-side dispatcher for the JSON-RPC binding. No HTTP dependency.
         .library(name: "A2AServerJSONRPC", targets: ["A2AServerJSONRPC"]),
-        // REST（HTTP+JSON）バインディングのサーバ側ディスパッチャ（HTTP 非依存）
+        // Server-side dispatcher for the HTTP+JSON binding. No HTTP dependency.
         .library(name: "A2AServerREST", targets: ["A2AServerREST"]),
-        // in-process バインディング: 同一プロセス内で client(A2ATransport) ↔ server(RequestHandler) を型直結
+        // In-process binding: wires the client protocol straight to a server handler, no wire format.
         .library(name: "A2AInProcess", targets: ["A2AInProcess"]),
     ],
     dependencies: [
@@ -31,29 +31,31 @@ let package = Package(
         .package(url: "https://github.com/no-problem-dev/swift-structured-data.git", "1.3.0" ..< "3.0.0"),
     ],
     targets: [
-        // 規定プロトコル層: データモデル + ProtoJSON Codable + 構築ビルダー
+        // Protocol layer: data model, ProtoJSON Codable conformances, message builder.
         .target(
             name: "A2ACore",
             dependencies: [
                 .product(name: "StructuredDataCore", package: "swift-structured-data"),
             ]
         ),
-        // クライアント共通基盤（非公開）: A2AClient actor / A2ATransport 抽象 / SSE / 認証 / AgentCard 取得
+        // Shared client plumbing, not published as a product: the client facade, the transport
+        // protocol, SSE parsing, authentication, and agent-card lookup.
         .target(
             name: "A2AClientCore",
             dependencies: ["A2ACore"]
         ),
-        // REST バインディング実装
+        // REST binding.
         .target(
             name: "A2AClientREST",
             dependencies: ["A2AClientCore"]
         ),
-        // JSON-RPC バインディング実装
+        // JSON-RPC binding.
         .target(
             name: "A2AClientJSONRPC",
             dependencies: ["A2AClientCore"]
         ),
-        // サーバ実装フレームワーク（proto 非定義のリファレンス実装構造を写経、依存は A2ACore のみ）
+        // Server framework. Its shape follows the reference implementation rather than the proto
+        // definitions, which say nothing about server structure. Depends only on A2ACore.
         .target(
             name: "A2AServer",
             dependencies: ["A2ACore"]
@@ -67,7 +69,7 @@ let package = Package(
             name: "A2AServerTests",
             dependencies: ["A2AServer"]
         ),
-        // JSON-RPC サーバ側ディスパッチャ: 封筒のデコード → RequestHandler 呼び出し → 封筒エンコード
+        // JSON-RPC dispatcher: decode envelope, call the handler, encode the answer.
         .target(
             name: "A2AServerJSONRPC",
             dependencies: ["A2AServer", "A2ACore"]
@@ -76,7 +78,7 @@ let package = Package(
             name: "A2AServerJSONRPCTests",
             dependencies: ["A2AServerJSONRPC"]
         ),
-        // REST サーバ側ディスパッチャ: (HTTP method, path, query, body) → RequestHandler 呼び出し
+        // REST dispatcher: route (method, path, query, body) to a handler call.
         .target(
             name: "A2AServerREST",
             dependencies: [
@@ -89,7 +91,7 @@ let package = Package(
             name: "A2AServerRESTTests",
             dependencies: ["A2AServerREST"]
         ),
-        // in-process バインディング: A2ATransport を RequestHandler 直結で実装（同一プロセス・型安全）
+        // In-process binding: implements the transport protocol by calling a handler directly.
         .target(
             name: "A2AInProcess",
             dependencies: ["A2AClientCore", "A2AServer", "A2ACore"]

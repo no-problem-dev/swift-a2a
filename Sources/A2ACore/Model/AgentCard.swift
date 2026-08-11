@@ -1,36 +1,39 @@
 // MARK: - AgentCard
 
-/// エージェントの自己記述マニフェスト（A2A `AgentCard`）。
+/// An agent's self-description: who it is, what it can do, how to reach it and how to authenticate.
 ///
-/// 通常 `https://{host}/.well-known/agent-card.json` で公開される。
+/// Served at the well-known path, so a client can discover an agent knowing only its host. An
+/// extended card carrying more detail may be available to authenticated callers.
 public struct AgentCard: Sendable, Hashable {
-    /// 人間可読なエージェント名。
+    /// The agent's name, for people to read.
     public var name: String
-    /// エージェントの説明。
+    /// What the agent does, for people to read.
     public var description: String
-    /// 対応インターフェース一覧（順序付き。先頭が推奨）。
+    /// The endpoints this agent answers on, most preferred first. A client that speaks more than
+    /// one binding should take the first entry it recognizes.
     public var supportedInterfaces: [AgentInterface]
-    /// 提供元情報。
+    /// Who publishes the agent.
     public var provider: AgentProvider?
-    /// エージェントのバージョン。
+    /// The agent's own version, unrelated to the protocol version.
     public var version: String
-    /// 追加ドキュメントの URL。
+    /// Where to read more about the agent.
     public var documentationUrl: String?
-    /// 対応ケイパビリティ。
+    /// The optional protocol features this agent supports.
     public var capabilities: AgentCapabilities
-    /// セキュリティスキーム定義（名前 → スキーム）。
+    /// The authentication schemes this agent accepts, keyed by the name `security` refers to.
     public var securitySchemes: [String: SecurityScheme]?
-    /// セキュリティ要件（OpenAPI 慣習のフラット形）。
+    /// Which schemes a caller must satisfy, in the flat OpenAPI shape — see ``SecurityRequirement``
+    /// for why this diverges from the Protocol Buffer definition.
     public var security: [SecurityRequirement]
-    /// 全スキル共通の既定入力モード（メディアタイプ）。
+    /// Media types every skill accepts, unless a skill overrides them.
     public var defaultInputModes: [String]
-    /// 既定出力モード（メディアタイプ）。
+    /// Media types every skill produces, unless a skill overrides them.
     public var defaultOutputModes: [String]
-    /// エージェントのスキル一覧。
+    /// What the agent can be asked to do.
     public var skills: [AgentSkill]
-    /// このカードに対する JWS 署名。
+    /// JWS signatures over this card. Nothing here verifies them.
     public var signatures: [AgentCardSignature]
-    /// エージェントアイコンの URL。
+    /// An icon for the agent.
     public var iconUrl: String?
 
     public init(
@@ -83,7 +86,9 @@ extension AgentCard: Codable {
         documentationUrl = try container.decodeIfPresent(String.self, forKey: .documentationUrl)
         capabilities = try container.decodeIfPresent(AgentCapabilities.self, forKey: .capabilities) ?? AgentCapabilities()
         securitySchemes = try container.decodeIfPresent([String: SecurityScheme].self, forKey: .securitySchemes)
-        // proto json_name は securityRequirements だが docs/エコシステムは security。両方受理。
+        // The Protocol Buffer json_name is `securityRequirements`, but the specification's own
+        // examples and the wider ecosystem write `security`. Both are accepted on the way in;
+        // encoding always writes `security`.
         if container.contains(.security) {
             security = try container.decodeArray(forKey: .security)
         } else {
@@ -117,15 +122,17 @@ extension AgentCard: Codable {
 
 // MARK: - AgentInterface
 
-/// エージェントの対応インターフェース宣言（A2A `AgentInterface`）。
+/// One endpoint an agent answers on, and the binding it speaks there.
 public struct AgentInterface: Sendable, Hashable {
-    /// このインターフェースの URL（本番は絶対 HTTPS）。
+    /// Where to send requests. Absolute HTTPS in production.
     public var url: String
-    /// プロトコルバインディング（`JSONRPC` / `GRPC` / `HTTP+JSON` または URI）。
+    /// Which binding this endpoint speaks: `JSONRPC`, `GRPC`, `HTTP+JSON`, or a URI naming another.
+    /// This package implements the first and third; `GRPC` endpoints cannot be reached from here.
     public var protocolBinding: String
-    /// マルチテナント用のルーティング識別子。
+    /// An opaque routing identifier for multi-tenant deployments, echoed back on requests.
     public var tenant: String?
-    /// このインターフェースが公開する A2A プロトコルバージョン（例 `1.0`）。
+    /// The major protocol version this endpoint speaks, such as `1.0` — coarser than the spec
+    /// revision sent in the version header.
     public var protocolVersion: String
 
     public init(url: String, protocolBinding: String, protocolVersion: String = "", tenant: String? = nil) {
@@ -158,11 +165,11 @@ extension AgentInterface: Codable {
 
 // MARK: - AgentProvider
 
-/// エージェントの提供元（A2A `AgentProvider`）。
+/// Who publishes an agent.
 public struct AgentProvider: Sendable, Hashable {
-    /// 提供元 Web サイト等の URL。
+    /// The provider's website.
     public var url: String
-    /// 提供元組織名。
+    /// The organization's name.
     public var organization: String
 
     public init(url: String, organization: String) {
@@ -189,15 +196,19 @@ extension AgentProvider: Codable {
 
 // MARK: - AgentCapabilities
 
-/// エージェントの任意ケイパビリティ（A2A `AgentCapabilities`）。
+/// The optional protocol features an agent supports.
+///
+/// Each flag is three-valued: `true`, `false`, and absent. The server framework here treats
+/// anything other than an explicit `true` as unsupported, so leaving `streaming` unset makes
+/// streaming requests fail.
 public struct AgentCapabilities: Sendable, Hashable {
-    /// ストリーミング応答に対応するか。
+    /// Whether the agent can stream updates rather than only answering once.
     public var streaming: Bool?
-    /// 非同期タスク更新のプッシュ通知に対応するか。
+    /// Whether the agent can push task updates to a webhook.
     public var pushNotifications: Bool?
-    /// 対応する拡張一覧。
+    /// The protocol extensions the agent supports.
     public var extensions: [AgentExtension]
-    /// 認証時に拡張 Agent Card を提供できるか。
+    /// Whether an authenticated caller can fetch a fuller card.
     public var extendedAgentCard: Bool?
 
     public init(
@@ -228,7 +239,8 @@ extension AgentCapabilities: Codable {
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        // optional bool は presence-tracked。設定されていれば false でも出力。
+        // Presence is meaningful for these flags, so an explicit `false` is written out — unlike
+        // the proto3 default-value rule applied to the non-optional fields.
         try container.encodeIfPresent(streaming, forKey: .streaming)
         try container.encodeIfPresent(pushNotifications, forKey: .pushNotifications)
         try container.encodeIfNonEmpty(extensions, forKey: .extensions)
@@ -238,15 +250,16 @@ extension AgentCapabilities: Codable {
 
 // MARK: - AgentExtension
 
-/// エージェントが対応するプロトコル拡張の宣言（A2A `AgentExtension`）。
+/// A protocol extension an agent supports.
 public struct AgentExtension: Sendable, Hashable {
-    /// 拡張を一意に識別する URI。
+    /// Identifies the extension. Clients match on this exact string.
     public var uri: String
-    /// この拡張の利用方法の説明。
+    /// How to use the extension, for people to read.
     public var description: String?
-    /// `true` ならクライアントはこの拡張を理解・遵守する必要がある。
+    /// Whether a client must understand this extension to interoperate at all. Nothing here
+    /// enforces it — a client that ignores a required extension is on its own.
     public var required: Bool
-    /// 拡張固有の構成パラメータ。
+    /// Configuration the extension defines.
     public var params: A2AMetadata?
 
     public init(uri: String, description: String? = nil, required: Bool = false, params: A2AMetadata? = nil) {
@@ -279,23 +292,26 @@ extension AgentExtension: Codable {
 
 // MARK: - AgentSkill
 
-/// エージェントが実行できる機能（A2A `AgentSkill`）。
+/// Something an agent can be asked to do.
+///
+/// Skills are advertisement, not routing: there is no field on a request that selects one. A
+/// client picks an agent by its skills and then says what it wants in a message.
 public struct AgentSkill: Sendable, Hashable {
-    /// スキルの一意識別子。
+    /// Identifies the skill within the card.
     public var id: String
-    /// スキル名。
+    /// The skill's name, for people to read.
     public var name: String
-    /// スキルの説明。
+    /// What the skill does, for people to read.
     public var description: String
-    /// スキルの能力を表すキーワード。
+    /// Keywords for discovery.
     public var tags: [String]
-    /// このスキルが扱える例（プロンプト等）。
+    /// Sample prompts this skill handles.
     public var examples: [String]
-    /// エージェント既定を上書きする入力モード。
+    /// Media types this skill accepts, replacing the card's defaults when non-empty.
     public var inputModes: [String]
-    /// エージェント既定を上書きする出力モード。
+    /// Media types this skill produces, replacing the card's defaults when non-empty.
     public var outputModes: [String]
-    /// このスキルに必要なセキュリティ要件。
+    /// Authentication this skill requires beyond the card's own requirements.
     public var securityRequirements: [SecurityRequirement]
 
     public init(
@@ -351,13 +367,16 @@ extension AgentSkill: Codable {
 
 // MARK: - AgentCardSignature
 
-/// Agent Card の JWS 署名（A2A `AgentCardSignature`、RFC 7515）。
+/// A JWS signature over an agent card, in the detached form of RFC 7515.
+///
+/// Nothing in this package produces or verifies these — the fields are carried through so a caller
+/// can hand them to a JWS implementation.
 public struct AgentCardSignature: Sendable, Hashable {
-    /// 保護 JWS ヘッダ（base64url エンコードの JSON）。
+    /// The protected JWS header: base64url-encoded JSON, covered by the signature.
     public var `protected`: String
-    /// 計算された署名（base64url）。
+    /// The signature itself, base64url-encoded.
     public var signature: String
-    /// 非保護 JWS ヘッダ値。
+    /// Unprotected header values, which the signature does not cover.
     public var header: A2AMetadata?
 
     public init(protected: String, signature: String, header: A2AMetadata? = nil) {

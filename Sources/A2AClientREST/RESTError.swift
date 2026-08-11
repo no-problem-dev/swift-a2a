@@ -1,6 +1,6 @@
 import StructuredDataCore
 
-/// HTTP+JSON / REST のエラー本体（`google.rpc.Status` JSON 表現。仕様 §11.6）。
+/// The REST error body: `google.rpc.Status` in its JSON form, nested under `error` (spec §11.6).
 struct RESTErrorEnvelope: Decodable {
     let error: RESTErrorBody?
 }

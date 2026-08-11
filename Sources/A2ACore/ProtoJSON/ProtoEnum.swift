@@ -1,11 +1,15 @@
-/// ProtoJSON で `SCREAMING_SNAKE_CASE` の文字列名としてシリアライズされる enum 共通実装。
+/// An enum written on the wire as its Protocol Buffer name, such as `ROLE_USER` or
+/// `TASK_STATE_INPUT_REQUIRED` (spec §5.5).
 ///
-/// A2A 仕様 §5.5 に従い、enum 値は Protocol Buffer 定義の名前（例 `ROLE_USER`,
-/// `TASK_STATE_INPUT_REQUIRED`）として表現される。未知の値は前方互換性のため
-/// `unspecified` ケースへフォールバックする（§5.7 "ignore unrecognized"）。
+/// Decoding never fails on an unrecognized name: it yields `unspecified`, which is what keeps a
+/// client working against an agent that has learned a new state (spec §5.7, ignore unrecognized).
+///
+/// That tolerance is lossy in one direction. An unrecognized value becomes `unspecified`, and
+/// encoding omits `unspecified` entirely, so relaying a decoded value back to a peer silently
+/// drops the field. Do not use this type to proxy payloads verbatim.
 public protocol ProtoEnum: RawRepresentable, Codable, Sendable, Hashable, CaseIterable
 where RawValue == String {
-    /// 未知値・未指定をデコードした際のフォールバック先。
+    /// The case that unrecognized and absent values decode to, and that encoding omits.
     static var unspecified: Self { get }
 }
 

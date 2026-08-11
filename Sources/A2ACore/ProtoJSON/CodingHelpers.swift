@@ -1,39 +1,45 @@
-/// ProtoJSON（proto3 JSON マッピング）のセマンティクスを簡潔に表現するコンテナ拡張。
-///
-/// - デコード: 欠落フィールドは proto3 の既定値（空文字列・0・`false`・空配列・`UNSPECIFIED`）に補完し、例外を投げない。
-/// - エンコード: 既定値と等しいフィールドは出力しない（`MessageToDict` 既定挙動に一致）。
+// Container helpers that put proto3's JSON mapping rules in one place.
+//
+// Decoding: an absent field is not an error. It becomes the proto3 default — empty string, 0,
+// false, empty array, UNSPECIFIED — because in proto3 a default-valued field and an absent one are
+// the same thing on the wire.
+//
+// Encoding: a field equal to its default is omitted, matching what protobuf's own JSON writer does
+// by default. The consequence worth knowing is that a required-looking field with an empty value
+// simply does not appear in the output.
 extension KeyedDecodingContainer {
-    /// 任意 repeated フィールド。欠落なら空配列。
+    /// Decodes a repeated field, yielding an empty array when it is absent.
     func decodeArray<T: Decodable>(_ type: T.Type = T.self, forKey key: Key) throws -> [T] {
         try decodeIfPresent([T].self, forKey: key) ?? []
     }
 
-    /// bool。欠落なら `false`。
+    /// Decodes a bool, yielding `false` when it is absent.
     func decodeBool(forKey key: Key) throws -> Bool {
         try decodeIfPresent(Bool.self, forKey: key) ?? false
     }
 
-    /// string。欠落なら空文字列。
+    /// Decodes a string, yielding the empty string when it is absent.
     func decodeString(forKey key: Key) throws -> String {
         try decodeIfPresent(String.self, forKey: key) ?? ""
     }
 
-    /// int。欠落なら 0。
+    /// Decodes an integer, yielding 0 when it is absent.
     func decodeInt(forKey key: Key) throws -> Int {
         try decodeIfPresent(Int.self, forKey: key) ?? 0
     }
 
-    /// proto enum。欠落・未知値なら `.unspecified`。
+    /// Decodes an enum, yielding `.unspecified` when it is absent or unrecognized.
     func decodeProtoEnum<E: ProtoEnum>(_ type: E.Type = E.self, forKey key: Key) throws -> E {
         try decodeIfPresent(E.self, forKey: key) ?? .unspecified
     }
 
-    /// 必須 ID。欠落なら空 ID。
+    /// Decodes a required identifier, yielding an empty one when it is absent — which is how a
+    /// missing required ID survives decoding instead of throwing.
     func decodeID<I: A2AIdentifier>(_ type: I.Type = I.self, forKey key: Key) throws -> I {
         try decodeIfPresent(I.self, forKey: key) ?? I("")
     }
 
-    /// 任意 ID。欠落または空文字列なら `nil`。
+    /// Decodes an optional identifier, treating both an absent field and an empty string as `nil`.
     func decodeOptionalID<I: A2AIdentifier>(_ type: I.Type = I.self, forKey key: Key) throws -> I? {
         guard let id = try decodeIfPresent(I.self, forKey: key), !id.rawValue.isEmpty else { return nil }
         return id
@@ -41,37 +47,37 @@ extension KeyedDecodingContainer {
 }
 
 extension KeyedEncodingContainer {
-    /// 非空のときだけ encode。
+    /// Writes an array only when it has elements.
     mutating func encodeIfNonEmpty<T: Encodable>(_ value: [T], forKey key: Key) throws {
         if !value.isEmpty { try encode(value, forKey: key) }
     }
 
-    /// 非空マップのときだけ encode。
+    /// Writes a map only when it has entries.
     mutating func encodeIfNonEmpty<V: Encodable>(_ value: [String: V], forKey key: Key) throws {
         if !value.isEmpty { try encode(value, forKey: key) }
     }
 
-    /// 非空文字列のときだけ encode。
+    /// Writes a string only when it is non-empty.
     mutating func encodeIfNonEmpty(_ value: String, forKey key: Key) throws {
         if !value.isEmpty { try encode(value, forKey: key) }
     }
 
-    /// 非空 ID のときだけ encode。
+    /// Writes an identifier only when it is non-empty.
     mutating func encodeIfNonEmpty<I: A2AIdentifier>(_ value: I, forKey key: Key) throws {
         if !value.rawValue.isEmpty { try encode(value, forKey: key) }
     }
 
-    /// 0 以外のときだけ encode。
+    /// Writes an integer only when it is not zero.
     mutating func encodeIfNonZero(_ value: Int, forKey key: Key) throws {
         if value != 0 { try encode(value, forKey: key) }
     }
 
-    /// `true` のときだけ encode。
+    /// Writes a bool only when it is `true`.
     mutating func encodeIfTrue(_ value: Bool, forKey key: Key) throws {
         if value { try encode(value, forKey: key) }
     }
 
-    /// `.unspecified` 以外のときだけ encode。
+    /// Writes an enum only when it is not `.unspecified`.
     mutating func encode<E: ProtoEnum>(proto value: E, forKey key: Key) throws {
         if value != .unspecified { try encode(value, forKey: key) }
     }

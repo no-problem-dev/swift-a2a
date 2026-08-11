@@ -3,7 +3,11 @@ import A2ACore
 import A2AClientCore
 import StructuredDataCore
 
-/// JSON-RPC 2.0 バインディング（仕様 §9）。単一エンドポイントへ POST し、SSE でストリーミングする。
+/// The JSON-RPC 2.0 binding (spec §9): every operation is a POST to one endpoint, and streaming
+/// operations answer with Server-Sent Events whose data is one response envelope per event.
+///
+/// Errors carried inside an envelope become `A2AError.rpc` and keep their code; a non-2xx response
+/// whose body is not an envelope becomes `A2AError.http`.
 public struct JSONRPCTransport: A2ATransport {
     private let http: HTTPClient
     private let endpoint: URL
@@ -13,7 +17,8 @@ public struct JSONRPCTransport: A2ATransport {
         self.endpoint = endpoint
     }
 
-    /// JSON-RPC メソッド名（PascalCase。gRPC と統一。仕様 §9.1）。
+    /// The method names (spec §9.1), spelled to match the gRPC service methods rather than in the
+    /// lowercase dotted style earlier revisions used.
     private enum Method {
         static let sendMessage = "SendMessage"
         static let sendStreamingMessage = "SendStreamingMessage"
@@ -121,7 +126,8 @@ public struct JSONRPCTransport: A2ATransport {
         guard (200...299).contains(response.statusCode) else {
             throw A2AError.http(status: response.statusCode, body: String(data: data, encoding: .utf8))
         }
-        // 結果が空でも error フィールドのみ確認する。
+        // A void operation has no result to decode, so only the error field is inspected; a body
+        // that is not an envelope at all is treated as success.
         if let envelope = try? A2AJSON.makeDecoder().decode(JSONRPCResponse<StructuredValue>.self, from: data),
            let error = envelope.error {
             throw A2AError.rpc(A2ARemoteError(code: error.code, message: error.message, details: error.data ?? []))

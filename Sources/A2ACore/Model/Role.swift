@@ -1,11 +1,10 @@
-/// メッセージの送信者（A2A `Role`）。
-///
-/// ProtoJSON では `ROLE_USER` / `ROLE_AGENT` として表現される。
+/// Who sent a message, serialized as the Protocol Buffer enum name (`ROLE_USER`, `ROLE_AGENT`).
 public enum Role: String, ProtoEnum {
-    /// 未指定（未知値のフォールバック先）。
+    /// The absent or unrecognized value. Decoding any name this enum does not know lands here,
+    /// and encoding it omits the field entirely.
     case unspecified = "ROLE_UNSPECIFIED"
-    /// クライアント（リクエスター）からのメッセージ。
+    /// Sent by the client that made the request.
     case user = "ROLE_USER"
-    /// エージェント（レスポンダー）からのメッセージ。
+    /// Sent by the agent answering it.
     case agent = "ROLE_AGENT"
 }

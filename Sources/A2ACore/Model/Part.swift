@@ -1,31 +1,36 @@
 import Foundation
 import StructuredDataCore
 
-/// メッセージ／アーティファクトを構成するコンテンツ片（A2A `Part`）。
+/// A piece of content inside a message or an artifact.
 ///
-/// v1.0 では判別子フィールド（旧 `type`/`kind`）を持たず、コンテンツ種別は
-/// JSON のメンバ名（`text` / `raw` / `url` / `data`）で表される。`filename`・
-/// `mediaType`・`metadata` はコンテンツ種別と並列の任意フィールド。
+/// v1.0 dropped the discriminator field earlier revisions carried (`type`, then `kind`). The
+/// content kind is now the JSON member name itself — `text`, `raw`, `url` or `data` — while
+/// `filename`, `mediaType` and `metadata` sit alongside it and apply to any kind.
+///
+/// Decoding rejects an object carrying none of the four content members. It does not reject one
+/// carrying several: the first match in the order `text`, `raw`, `url`, `data` wins and the rest
+/// are dropped silently.
 public struct Part: Sendable, Hashable {
-    /// コンテンツ本体（oneof）。
+    /// The four content kinds, exactly one of which a part carries.
     public enum Content: Sendable, Hashable {
-        /// テキスト。
+        /// Plain text.
         case text(String)
-        /// ファイルのバイト列（JSON では Base64 文字列、proto `raw`）。
+        /// File contents inline, Base64-encoded on the wire (proto `raw`).
         case bytes(Data)
-        /// ファイルの参照 URI（proto `url`）。
+        /// A URI pointing at the file rather than carrying it (proto `url`).
         case uri(String)
-        /// 任意の構造化データ（proto `data`、JSON の任意値）。
+        /// Arbitrary JSON (proto `data`), for structured payloads with no schema fixed by A2A.
         case data(StructuredValue)
     }
 
-    /// コンテンツ本体。
+    /// What this part carries.
     public var content: Content
-    /// このパートに付随するメタデータ。
+    /// Free-form data carried alongside the content.
     public var metadata: A2AMetadata?
-    /// ファイル名（例 `document.pdf`）。
+    /// The originating file name, such as `document.pdf`.
     public var filename: String?
-    /// コンテンツの MIME タイプ（例 `text/plain`, `image/png`）。全種別で利用可能。
+    /// The media type of the content, such as `text/plain` or `image/png`. Valid for every content
+    /// kind, including text and structured data.
     public var mediaType: String?
 
     public init(
@@ -44,12 +49,15 @@ public struct Part: Sendable, Hashable {
 // MARK: - Convenience Constructors
 
 extension Part {
-    /// テキストパートを作成。
+    /// Creates a text part.
     public static func text(_ text: String, metadata: A2AMetadata? = nil) -> Part {
         Part(content: .text(text), metadata: metadata)
     }
 
-    /// バイト列を持つファイルパートを作成。
+    /// Creates a file part carrying the contents inline.
+    ///
+    /// The bytes are Base64-encoded on the wire, so this inflates the payload by roughly a third —
+    /// prefer the URI form for anything large.
     public static func file(
         bytes: Data,
         filename: String? = nil,
@@ -59,7 +67,9 @@ extension Part {
         Part(content: .bytes(bytes), metadata: metadata, filename: filename, mediaType: mediaType)
     }
 
-    /// URI を持つファイルパートを作成。
+    /// Creates a file part that points at the content instead of carrying it.
+    ///
+    /// Nothing here fetches the URI or checks that the recipient can reach it.
     public static func file(
         uri: String,
         filename: String? = nil,
@@ -69,7 +79,7 @@ extension Part {
         Part(content: .uri(uri), metadata: metadata, filename: filename, mediaType: mediaType)
     }
 
-    /// 構造化データパートを作成。
+    /// Creates a part carrying arbitrary JSON.
     public static func data(
         _ data: StructuredValue,
         mediaType: String? = nil,
@@ -82,25 +92,25 @@ extension Part {
 // MARK: - Accessors
 
 extension Part {
-    /// テキストパートならその文字列。
+    /// The text, or `nil` for any other content kind.
     public var text: String? {
         if case .text(let value) = content { return value }
         return nil
     }
 
-    /// バイト列ファイルパートならそのデータ。
+    /// The inline file contents, or `nil` for any other content kind.
     public var bytes: Data? {
         if case .bytes(let value) = content { return value }
         return nil
     }
 
-    /// URI ファイルパートならその URI。
+    /// The file URI, or `nil` for any other content kind.
     public var uri: String? {
         if case .uri(let value) = content { return value }
         return nil
     }
 
-    /// データパートならその構造化値。
+    /// The structured payload, or `nil` for any other content kind.
     public var data: StructuredValue? {
         if case .data(let value) = content { return value }
         return nil
@@ -158,7 +168,8 @@ extension Part: Codable {
 // MARK: - ExpressibleByStringLiteral
 
 extension Part: ExpressibleByStringLiteral {
-    /// 文字列リテラルからテキストパートを作成（ビルダー DSL 用）。
+    /// Makes a bare string literal usable wherever a part is expected, which is what lets the
+    /// message builder take text without ceremony.
     public init(stringLiteral value: String) {
         self = .text(value)
     }

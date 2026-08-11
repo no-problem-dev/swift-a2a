@@ -2,8 +2,12 @@ import A2ACore
 import A2AServer
 import Foundation
 
-/// `(method, path, query, body)` を仕様 §11 のリソースマッピングでルーティングして `RequestHandler`
-/// を呼ぶディスパッチャ（a2a-python `rest_dispatcher`）。HTTP 非依存（`RESTRequest`/`RESTResponse`）。
+/// Routes a request by method and path to the matching handler method, per the resource mapping in
+/// spec §11.
+///
+/// Nothing here knows about HTTP: it takes a ``RESTRequest`` and returns a ``RESTOutcome`` for the
+/// server to write. Custom verbs are the `:verb` suffix on the last path segment — `:cancel`,
+/// `:subscribe` — and identifiers in the path are percent-decoded.
 public struct RESTHandler: Sendable {
     private let handler: any RequestHandler
     private let encoder = A2AJSON.makeEncoder()
@@ -13,6 +17,20 @@ public struct RESTHandler: Sendable {
         self.handler = handler
     }
 
+    /// Routes and dispatches one request.
+    ///
+    /// Never throws: every failure becomes an error response whose status comes from the A2A code.
+    /// A path that matches no route answers `404` carrying the task-not-found code, whether or not
+    /// the request had anything to do with a task. A body that will not decode answers `400`.
+    ///
+    /// Note that `statusTimestampAfter` is parsed without fractional seconds, so a timestamp
+    /// carrying them — which is what this package's own client sends — is dropped and the filter
+    /// silently does not apply.
+    ///
+    /// - Parameters:
+    ///   - request: The routed request.
+    ///   - context: Who is calling. Defaults to an unauthenticated caller — populate it in the
+    ///     HTTP layer, or every request shares one storage scope.
     public func handle(_ request: RESTRequest, context: ServerCallContext = ServerCallContext()) async -> RESTOutcome {
         let segments = request.path.split(separator: "/").map(String.init)
         let method = request.method.uppercased()
@@ -254,7 +272,7 @@ public struct RESTHandler: Sendable {
     }
 }
 
-/// `/tasks/{id}:cancel` のリクエストボディ（`{metadata}`）。
+/// The body of a cancel request, which carries nothing but optional metadata.
 private struct MetadataBody: Decodable {
     let metadata: A2AMetadata?
 }

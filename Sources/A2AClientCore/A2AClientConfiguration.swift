@@ -1,17 +1,21 @@
 import Foundation
 
-/// A2A クライアントの設定。
+/// Everything a client needs to reach one agent: where it is, how to authenticate, how long to
+/// wait, and which extensions to opt into.
 public struct A2AClientConfiguration: Sendable {
-    /// バインディングのエンドポイント。JSON-RPC では POST 先の単一 URL、
-    /// REST では各操作パスを連結するベース URL。
+    /// The endpoint. For JSON-RPC this is the single URL every request is posted to; for REST it
+    /// is the prefix each operation path is appended to. Agent-card lookup ignores the path
+    /// entirely and goes to the host's well-known location.
     public var baseURL: URL
-    /// 認証方式。
+    /// What to send to prove who the client is.
     public var authentication: A2AAuthentication
-    /// 通常リクエストのタイムアウト（秒）。
+    /// Seconds to wait on a non-streaming request.
     public var timeout: TimeInterval
-    /// ストリーミングリクエストのタイムアウト（秒）。
+    /// Seconds to wait on a streaming request. Longer than `timeout` by default, since a stream is
+    /// expected to stay open. This is a whole-request budget, not an idle timeout, so a stream that
+    /// legitimately runs longer will be cut off.
     public var streamTimeout: TimeInterval
-    /// オプトインする拡張の URI 一覧（`A2A-Extensions` ヘッダ）。
+    /// Extension URIs to declare in the `A2A-Extensions` header, comma-separated on the wire.
     public var extensions: [String]
 
     public init(

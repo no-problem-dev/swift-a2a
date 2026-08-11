@@ -3,7 +3,7 @@ import Testing
 import StructuredDataCore
 @testable import A2ACore
 
-/// 公式仕様 v1.0.1 の例に対する ProtoJSON コンフォーマンス検証。
+/// Checks the encoding against the examples published in specification revision 1.0.1.
 @Suite("ProtoJSON Conformance")
 struct ProtoJSONConformanceTests {
     let decoder = A2AJSON.makeDecoder()
@@ -162,13 +162,13 @@ struct ProtoJSONConformanceTests {
         #expect(card.security == [["google": ["openid", "profile", "email"]]])
         #expect(card.signatures.count == 1)
 
-        // securitySchemes は ProtoJSON oneof（メンバ名判別）
+        // Security schemes are a oneof discriminated by member name, not by a type field.
         guard case .openIdConnect(let scheme) = card.securitySchemes?["google"] else {
             Issue.record("expected openIdConnect scheme"); return
         }
         #expect(scheme.openIdConnectUrl == "https://accounts.google.com/.well-known/openid-configuration")
 
-        // 復号→符号化→復号のべき等性
+        // Decode, encode, decode again: the result must be identical.
         #expect(try roundTrip(card) == card)
     }
 

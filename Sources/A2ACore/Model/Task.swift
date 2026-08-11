@@ -1,18 +1,21 @@
 import Foundation
 
-/// A2A の中心的な作業単位（A2A `Task`）。現在の状態・成果物・対話履歴を保持する。
+/// A unit of work an agent carries out, carrying its state, its outputs and the exchange so far.
+///
+/// Named `A2ATask` rather than `Task` to avoid colliding with Swift concurrency's `Task`.
 public struct A2ATask: Sendable, Hashable {
-    /// タスクの一意識別子（サーバが採番）。
+    /// Identifies this task. The server assigns it.
     public var id: TaskID
-    /// 一連の対話（タスク・メッセージ）をまとめるコンテキスト ID。
+    /// The conversation this task belongs to.
     public var contextId: ContextID?
-    /// 現在のステータス。
+    /// Where the task is now, and when it got there.
     public var status: TaskStatus
-    /// タスクの出力成果物。
+    /// What the task has produced so far. Grows as a streaming agent emits artifact updates.
     public var artifacts: [Artifact]
-    /// タスクの対話履歴。
+    /// The messages exchanged, oldest first. A request may ask for only the most recent few, so a
+    /// short history does not mean a short conversation.
     public var history: [Message]
-    /// 付随メタデータ。
+    /// Free-form data carried alongside the task.
     public var metadata: A2AMetadata?
 
     public init(
@@ -58,13 +61,15 @@ extension A2ATask: Codable {
     }
 }
 
-/// タスクのステータス（A2A `TaskStatus`）。
+/// A task's state together with when it was recorded and any message explaining it.
 public struct TaskStatus: Sendable, Hashable {
-    /// 現在の状態。
+    /// The state itself.
     public var state: TaskState
-    /// ステータスに付随するメッセージ。
+    /// The agent's accompanying message — typically the question when work stopped for input, or
+    /// the reason when it failed. Appended to the task's history when the status is applied.
     public var message: Message?
-    /// ステータス記録時刻（RFC 3339 / UTC）。
+    /// When this state was recorded, sent as an RFC 3339 UTC timestamp. Absent on a status the
+    /// agent did not stamp, which pushes the task to the end of a timestamp-ordered listing.
     public var timestamp: Date?
 
     public init(state: TaskState, message: Message? = nil, timestamp: Date? = nil) {

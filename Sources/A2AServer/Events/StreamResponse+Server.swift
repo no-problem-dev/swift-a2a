@@ -1,6 +1,7 @@
 import A2ACore
 
-// サーバ内部で仕様型 `StreamResponse` を判定・分類するアクセサ（新しい型は導入しない）。
+// Classification the server needs, added to the specification's own event type rather than to a
+// parallel internal one.
 extension StreamResponse {
     var taskID: TaskID? {
         switch self {

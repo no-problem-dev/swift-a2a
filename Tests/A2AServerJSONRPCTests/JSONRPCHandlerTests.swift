@@ -4,7 +4,7 @@ import A2ACore
 import A2AServer
 @testable import A2AServerJSONRPC
 
-// MARK: - テスト用 executor
+// MARK: - Test executor
 
 private struct EchoExecutor: AgentExecutor {
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws {
@@ -16,7 +16,7 @@ private struct EchoExecutor: AgentExecutor {
     func cancel(_ context: RequestContext, eventQueue: EventQueue) async throws {}
 }
 
-// MARK: - テスト用の JSON-RPC 封筒（クライアントと同形）
+// MARK: - JSON-RPC envelopes for the test, matching what a client sends
 
 private struct RPCRequest<P: Encodable>: Encodable {
     let jsonrpc = "2.0"

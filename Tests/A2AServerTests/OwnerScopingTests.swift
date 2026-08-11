@@ -3,10 +3,8 @@ import Testing
 import A2ACore
 @testable import A2AServer
 
-/// owner スコープ分離の標準準拠テスト。
-///
-/// a2a-python `tests/server/tasks/test_inmemory_task_store.py::test_owner_resource_scoping`
-/// を 1:1 移植（spec §254/§13.1: クライアントは認可されたタスクのみ参照可）。
+/// Conformance for owner scoping: a client sees only the tasks it is authorized for
+/// (spec §254, §13.1). Ported case for case from the reference implementation.
 @Suite("TaskStore owner scoping (mirror of a2a-python test_owner_resource_scoping)")
 struct OwnerScopingTests {
 
@@ -27,14 +25,14 @@ struct OwnerScopingTests {
         try await store.save(task("u1-task2"), context: user1)
         try await store.save(task("u2-task1"), context: user2)
 
-        // GET: 自分の owner のものだけ見える
+        // Get: only the caller's own are visible.
         #expect(try await store.get(TaskID("u1-task1"), context: user1) != nil)
         #expect(try await store.get(TaskID("u1-task1"), context: user2) == nil)
         #expect(try await store.get(TaskID("u2-task1"), context: user1) == nil)
         #expect(try await store.get(TaskID("u2-task1"), context: user2) != nil)
         #expect(try await store.get(TaskID("u2-task1"), context: user3) == nil)
 
-        // LIST: owner ごとの件数
+        // List: counts are per owner.
         let p1 = try await store.list(ListTasksRequest(), context: user1)
         #expect(Set(p1.tasks.map(\.id.rawValue)) == ["u1-task1", "u1-task2"])
         #expect(p1.totalSize == 2)
@@ -45,7 +43,7 @@ struct OwnerScopingTests {
         #expect(p3.tasks.isEmpty)
         #expect(p3.totalSize == 0)
 
-        // DELETE: 他 owner からは削除できない
+        // Delete: one owner cannot remove another's.
         try await store.delete(TaskID("u1-task1"), context: user2) // no-op
         #expect(try await store.get(TaskID("u1-task1"), context: user1) != nil)
         try await store.delete(TaskID("u1-task1"), context: user1) // deletes
@@ -65,11 +63,11 @@ struct OwnerScopingTests {
             TaskPushNotificationConfig(url: "https://bob.example/hook", taskId: taskId, id: "b"),
             context: bob)
 
-        // 呼び出し系は owner スコープ
+        // Client-facing lookups stay within one owner.
         #expect(try await store.get(taskId: taskId, context: alice).map(\.id) == ["a"])
         #expect(try await store.get(taskId: taskId, context: bob).map(\.id) == ["b"])
 
-        // 配信系は owner 横断で全件
+        // Delivery lookup crosses owners and returns everything.
         let dispatch = try await store.configs(forDispatch: taskId)
         #expect(Set(dispatch.map(\.id)) == ["a", "b"])
     }

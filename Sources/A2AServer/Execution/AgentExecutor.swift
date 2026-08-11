@@ -1,20 +1,32 @@
 import A2ACore
 
-/// エージェントの中核ロジック（a2a-python `AgentExecutor`）。
+/// The agent itself: the one type you write to serve A2A.
 ///
-/// `execute` は `context` を読み `StreamResponse` を `eventQueue` へ publish する。終端状態
-/// （completed/failed/canceled/rejected）または中断状態（input-required/auth-required）を
-/// publish して return すること。input-required の場合、入力到来時に framework が再度 `execute`
-/// を呼ぶ。`execute` が throw すると framework がタスクを失敗状態へ遷移させる。
+/// Everything around it — task persistence, event fan-out, push delivery, transport encoding — is
+/// the framework's job. An executor reads the request and publishes events.
+///
+/// ``TaskUpdater`` is the convenient way to publish: it stamps timestamps and enforces that
+/// nothing follows a terminal state.
 public protocol AgentExecutor: Sendable {
-    /// `context` を読み、終端状態（または中断状態）まで `eventQueue` へ publish して return する。
+    /// Does the work, publishing events until the task reaches a terminal or interrupted state.
     ///
-    /// throw すると framework がタスクを `.failed` へ遷移させる。
+    /// Return only after publishing that final state; returning early leaves the caller waiting on
+    /// a task that never resolves. Publishing `.inputRequired` ends this run, and the framework
+    /// calls `execute` again with the same task when the client's reply arrives — so an executor
+    /// must be able to resume from `context.currentTask` rather than assuming a fresh start.
+    ///
+    /// Throwing is a legitimate way to fail: the framework publishes a failed status on your
+    /// behalf. Cancellation is not an error — a cancelled run is treated as a normal end.
+    ///
     /// - Parameters:
-    ///   - context: リクエスト情報・ユーザ・拡張情報を含むコンテキスト。
-    ///   - eventQueue: ステータス更新・アーティファクトを publish するキュー。
+    ///   - context: The request, the resolved identifiers, and the caller.
+    ///   - eventQueue: Where to publish status updates and artifacts. The framework closes it.
     func execute(_ context: RequestContext, eventQueue: EventQueue) async throws
 
-    /// 進行中タスクを停止し、`TaskState.canceled` を publish する。
+    /// Stops a running task and publishes a canceled status.
+    ///
+    /// Called on a separate queue from the run being stopped, which has already been cancelled by
+    /// the time this is invoked. The task is only reported as cancelled if this leaves it in the
+    /// canceled state; an executor that declines makes the request fail as not cancelable.
     func cancel(_ context: RequestContext, eventQueue: EventQueue) async throws
 }

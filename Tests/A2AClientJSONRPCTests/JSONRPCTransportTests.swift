@@ -30,7 +30,7 @@ struct JSONRPCTransportTests {
         #expect(task.id == "t")
         #expect(task.status.state == .completed)
 
-        // リクエスト封筒の検証
+        // Check the request envelope that went out.
         let request = captured.value!
         #expect(request.httpMethod == "POST")
         #expect(request.url == endpoint)
@@ -84,7 +84,7 @@ struct JSONRPCTransportTests {
     }
 }
 
-/// 封筒検証用の最小デコード型。
+/// Just enough of the request envelope to assert on.
 private struct EnvelopeProbe: Decodable {
     let jsonrpc: String
     let method: String

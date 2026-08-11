@@ -1,6 +1,6 @@
 import Foundation
 
-/// テスト用に `URLSession` を横取りするモックプロトコル。
+/// Intercepts `URLSession` so a test can answer requests without a server.
 final class MockURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var handler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
 
@@ -32,7 +32,8 @@ final class MockURLProtocol: URLProtocol, @unchecked Sendable {
 }
 
 extension URLRequest {
-    /// `URLSession` がボディをストリームへ移すため、`httpBody`/`httpBodyStream` 双方から本文を取得。
+    /// Reads the body from either property: `URLSession` moves it to a stream, so `httpBody` is
+    /// often empty by the time the protocol sees the request.
     var capturedBody: Data? {
         if let httpBody { return httpBody }
         guard let stream = httpBodyStream else { return nil }
@@ -56,7 +57,8 @@ func makeResponse(_ url: URL, status: Int = 200, contentType: String = "applicat
                     headerFields: ["Content-Type": contentType])!
 }
 
-/// ロック付きの可変ボックス（テストでのリクエストキャプチャ用）。
+/// A lock-guarded box, so a captured request can cross the concurrency boundary the protocol
+/// class imposes.
 final class Box<T>: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: T
