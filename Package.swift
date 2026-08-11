@@ -91,6 +91,12 @@ let package = Package(
             name: "A2AServerRESTTests",
             dependencies: ["A2AServerREST"]
         ),
+        // Both halves of the REST binding at once: what the client writes on the wire has to be
+        // what the server reads back. Neither side's own tests can see a mismatch between them.
+        .testTarget(
+            name: "A2ARESTRoundTripTests",
+            dependencies: ["A2AClientREST", "A2AServerREST"]
+        ),
         // In-process binding: implements the transport protocol by calling a handler directly.
         .target(
             name: "A2AInProcess",

@@ -23,9 +23,9 @@ public struct RESTHandler: Sendable {
     /// A path that matches no route answers `404` carrying the task-not-found code, whether or not
     /// the request had anything to do with a task. A body that will not decode answers `400`.
     ///
-    /// Note that `statusTimestampAfter` is parsed without fractional seconds, so a timestamp
-    /// carrying them — which is what this package's own client sends — is dropped and the filter
-    /// silently does not apply.
+    /// A query parameter that is present but unreadable answers `400` carrying the invalid-params
+    /// code. It is never dropped: a filter the server could not parse must not come back as a
+    /// successful, unfiltered listing.
     ///
     /// - Parameters:
     ///   - request: The routed request.
@@ -100,8 +100,8 @@ public struct RESTHandler: Sendable {
     }
 
     private func getTask(_ id: TaskID, _ query: [String: String], _ context: ServerCallContext) async -> RESTOutcome {
-        let request = GetTaskRequest(id: id, historyLength: query["historyLength"].flatMap(Int.init))
         do {
+            let request = GetTaskRequest(id: id, historyLength: try RESTQuery(query).int("historyLength"))
             if let task = try await handler.onGetTask(request, context: context) {
                 return ok(task)
             }
@@ -112,16 +112,17 @@ public struct RESTHandler: Sendable {
     }
 
     private func listTasks(_ query: [String: String], _ context: ServerCallContext) async -> RESTOutcome {
-        let request = ListTasksRequest(
-            contextId: query["contextId"].map(ContextID.init),
-            status: query["status"].flatMap(TaskState.init(rawValue:)),
-            pageSize: query["pageSize"].flatMap(Int.init),
-            pageToken: query["pageToken"],
-            historyLength: query["historyLength"].flatMap(Int.init),
-            statusTimestampAfter: query["statusTimestampAfter"].flatMap { ISO8601DateFormatter().date(from: $0) },
-            includeArtifacts: query["includeArtifacts"].map { $0 == "true" }
-        )
         do {
+            let query = RESTQuery(query)
+            let request = ListTasksRequest(
+                contextId: query.string("contextId").map(ContextID.init),
+                status: try query.taskState("status"),
+                pageSize: try query.int("pageSize"),
+                pageToken: query.string("pageToken"),
+                historyLength: try query.int("historyLength"),
+                statusTimestampAfter: try query.date("statusTimestampAfter"),
+                includeArtifacts: try query.bool("includeArtifacts")
+            )
             return ok(try await handler.onListTasks(request, context: context))
         } catch {
             return errorResponse(error)
@@ -171,12 +172,13 @@ public struct RESTHandler: Sendable {
     }
 
     private func listPushConfigs(_ taskId: TaskID, _ query: [String: String], _ context: ServerCallContext) async -> RESTOutcome {
-        let request = ListTaskPushNotificationConfigsRequest(
-            taskId: taskId,
-            pageSize: query["pageSize"].flatMap(Int.init),
-            pageToken: query["pageToken"]
-        )
         do {
+            let query = RESTQuery(query)
+            let request = ListTaskPushNotificationConfigsRequest(
+                taskId: taskId,
+                pageSize: try query.int("pageSize"),
+                pageToken: query.string("pageToken")
+            )
             return ok(try await handler.onListTaskPushNotificationConfigs(request, context: context))
         } catch {
             return errorResponse(error)

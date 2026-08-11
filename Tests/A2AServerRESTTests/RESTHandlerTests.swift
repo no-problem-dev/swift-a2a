@@ -104,6 +104,32 @@ struct RESTHandlerTests {
         #expect(response.status == 404)
     }
 
+    /// Every query parameter the dispatcher parses, with a value it cannot read.
+    ///
+    /// None of these may be dropped. A value the server does not understand has to come back as
+    /// invalid params — silently ignoring it answers 200 for a request that was never honoured.
+    static let unreadableQueries: [(path: String, query: [String: String])] = [
+        ("/tasks", ["status": "RUNNING"]),
+        ("/tasks", ["pageSize": "many"]),
+        ("/tasks", ["historyLength": "1.5"]),
+        ("/tasks", ["statusTimestampAfter": "2026-08-11"]),
+        ("/tasks", ["includeArtifacts": "yes"]),
+        ("/tasks/t1", ["historyLength": "all"]),
+        ("/tasks/t1/pushNotificationConfigs", ["pageSize": ""]),
+    ]
+
+    @Test("読めないクエリ値は黙って捨てず 400 invalid params", arguments: unreadableQueries)
+    func unreadableQueryValueIsRejected(_ c: (path: String, query: [String: String])) async throws {
+        let handler = makeHandler()
+        guard case .response(let response) = await handler.handle(
+            RESTRequest(method: "GET", path: c.path, query: c.query)
+        ) else { Issue.record("expected response"); return }
+
+        #expect(response.status == 400)
+        let error = try decoder.decode(RESTErrorOut.self, from: response.body)
+        #expect(error.error.code == -32602)
+    }
+
     @Test("プッシュ通知未対応エージェントでの設定作成は 501")
     func pushUnsupported() async throws {
         let handler = makeHandler()
