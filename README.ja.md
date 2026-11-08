@@ -48,11 +48,11 @@ case .message(let message):
 
 ライブラリごとに DocC ページがある：
 
-- [A2ACore](https://no-problem-dev.github.io/swift-a2a/documentation/a2acore/) — データモデルとその符号化
-- [A2AClientREST](https://no-problem-dev.github.io/swift-a2a/documentation/a2aclientrest/) · [A2AClientJSONRPC](https://no-problem-dev.github.io/swift-a2a/documentation/a2aclientjsonrpc/) — 2 つのクライアントバインディング
-- [A2AServer](https://no-problem-dev.github.io/swift-a2a/documentation/a2aserver/) — エージェントの実装とホスティング
-- [A2AServerREST](https://no-problem-dev.github.io/swift-a2a/documentation/a2aserverrest/) · [A2AServerJSONRPC](https://no-problem-dev.github.io/swift-a2a/documentation/a2aserverjsonrpc/) — サーバー側ディスパッチャ
-- [A2AInProcess](https://no-problem-dev.github.io/swift-a2a/documentation/a2ainprocess/) — ネットワーク無しのテスト
+- [A2ACore](Sources/A2ACore/Documentation.docc) — データモデルとその符号化
+- [A2AClientREST](Sources/A2AClientREST/Documentation.docc) · [A2AClientJSONRPC](Sources/A2AClientJSONRPC/Documentation.docc) — 2 つのクライアントバインディング
+- [A2AServer](Sources/A2AServer/Documentation.docc) — エージェントの実装とホスティング
+- [A2AServerREST](Sources/A2AServerREST/Documentation.docc) · [A2AServerJSONRPC](Sources/A2AServerJSONRPC/Documentation.docc) — サーバー側ディスパッチャ
+- [A2AInProcess](Sources/A2AInProcess/Documentation.docc) — ネットワーク無しのテスト
 
 ## インストール
 
