@@ -48,11 +48,11 @@ Streaming, task operations, push notification configuration, and the server side
 
 Each library has its own DocC page:
 
-- [A2ACore](https://no-problem-dev.github.io/swift-a2a/documentation/a2acore/) — the data model and its encoding
-- [A2AClientREST](https://no-problem-dev.github.io/swift-a2a/documentation/a2aclientrest/) · [A2AClientJSONRPC](https://no-problem-dev.github.io/swift-a2a/documentation/a2aclientjsonrpc/) — the two client bindings
-- [A2AServer](https://no-problem-dev.github.io/swift-a2a/documentation/a2aserver/) — writing and hosting an agent
-- [A2AServerREST](https://no-problem-dev.github.io/swift-a2a/documentation/a2aserverrest/) · [A2AServerJSONRPC](https://no-problem-dev.github.io/swift-a2a/documentation/a2aserverjsonrpc/) — the server-side dispatchers
-- [A2AInProcess](https://no-problem-dev.github.io/swift-a2a/documentation/a2ainprocess/) — testing without a network
+- [A2ACore](Sources/A2ACore/Documentation.docc) — the data model and its encoding
+- [A2AClientREST](Sources/A2AClientREST/Documentation.docc) · [A2AClientJSONRPC](Sources/A2AClientJSONRPC/Documentation.docc) — the two client bindings
+- [A2AServer](Sources/A2AServer/Documentation.docc) — writing and hosting an agent
+- [A2AServerREST](Sources/A2AServerREST/Documentation.docc) · [A2AServerJSONRPC](Sources/A2AServerJSONRPC/Documentation.docc) — the server-side dispatchers
+- [A2AInProcess](Sources/A2AInProcess/Documentation.docc) — testing without a network
 
 ## Installation
 
